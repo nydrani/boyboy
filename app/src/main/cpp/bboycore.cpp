@@ -2,6 +2,8 @@
 #include <thread>
 #include <queue>
 #include <cmath>
+#include <random>
+#include <iostream>
 
 #include <jni.h>
 #include <time.h>
@@ -9,14 +11,19 @@
 #include <GLES3/gl32.h>
 #include <GLES3/gl3ext.h>
 
-#include "bboycore.h"
+#include "bboycore.hpp"
+
 
 #include "glm/glm.hpp"
 #include "glm/gtc/type_ptr.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 
+#include "shapes/Circle.hpp"
+#include "tools/tools.hpp"
+
 static void initProgram();
 static bool initOpenGL();
+static bool initOpenGLObjects();
 static void runGameLoop();
 static bool setupScreen(int, int);
 static void processInput();
@@ -30,10 +37,6 @@ static void shutdown();
 static void storeEvent(struct EventItem);
 static void drawTouchDot();
 
-
-float degToRads(float degrees) {
-    return degrees * M_PI_FLOAT / 180;
-}
 
 static auto boxVertices = {100.0f, 100.0f, 0.0f,
                            100.0f, -100.0f, 0.0f,
@@ -195,9 +198,14 @@ static std::queue<struct EventItem> inputBuffer;
 static std::thread gameLoop;
 static bool running;
 
-GLuint triangleBuffer, rectangleBuffer;
-GLuint triangleVAO, rectangleVAO;
+static GLuint triangleBuffer, rectangleBuffer;
+static GLuint triangleVAO, rectangleVAO;
 static GLint mvpMatrixLoc;
+
+static std::mt19937 rng;
+
+static Circle circle;
+static glm::vec3 circlePosition;
 // =========================
 
 
@@ -255,6 +263,8 @@ static void initProgram() {
 
     curPosition = { 0.0f, 0.0f };
 
+    rng.seed(std::random_device()());
+
     running = true;
     paused = false;
 }
@@ -311,6 +321,15 @@ static bool initOpenGL() {
     return true;
 }
 
+static bool initOpenGLObjects() {
+    circle = Circle();
+
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    return true;
+}
+
 static bool setupScreen(int w, int h) {
     LOGI("setupScreen(%d, %d)", w, h);
 
@@ -323,7 +342,7 @@ static bool setupScreen(int w, int h) {
 
 static void stepGame() {
     yeeNum++;
-    yeeNum %= 10;
+    yeeNum %= 60;
 
     // increase vs decrease color
     bgColor += colorUpdate;
@@ -341,6 +360,14 @@ static void stepGame() {
     dotRotation += 1.0f;
     if (dotRotation > 360.0f) {
         dotRotation = 0.0f;
+    }
+
+    // update circle position
+    if (yeeNum == 0) {
+        std::uniform_real_distribution<float> rngPos(-500.0f, 500.0f);
+        float x = rngPos(rng);
+        float y = rngPos(rng);
+        circlePosition = glm::vec3(x, y, 0.0f);
     }
 }
 
@@ -445,6 +472,12 @@ static void drawTouchDot() {
     // glm::mat4 orthoMat = glm::ortho(0.0f, (float)width, 0.0f, (float)height);
 
     // place ortho camera to 0,0 centre with total width 1080 and height 1920
+    //
+    //       960
+    //        |
+    // -540 --+-- 540
+    //        |
+    //      -960
     glm::mat4 orthoMat = glm::ortho(-width/2.0f, width/2.0f, -height/2.0f, height/2.0f);
     glm::mat4 modelMat, mat;
 
@@ -455,6 +488,12 @@ static void drawTouchDot() {
     // draw rectangle loop at (0, 0)
     glBindVertexArray(rectangleVAO);
     glDrawArrays(GL_LINE_LOOP, 0, 4);
+
+    // draw circle at random point between (-100, 100)
+    modelMat = glm::translate(glm::mat4(1.0f), circlePosition);
+    mat = orthoMat * modelMat;
+    glUniformMatrix4fv(mvpMatrixLoc, 1, GL_FALSE, glm::value_ptr(mat));
+    circle.Draw();
 
     // translate the triangle to move it
     modelMat = glm::translate(glm::mat4(1.0f), glm::vec3(converted.x, converted.y, 0.0f));
@@ -524,6 +563,7 @@ JNIEXPORT jboolean JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_initOpe
     LOGV(__FUNCTION__, "initOpenGL");
 
     bool success = initOpenGL();
+    initOpenGLObjects();
 
     std::string hello = "initOpenGL";
     return jboolean(success);
