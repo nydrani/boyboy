@@ -4,14 +4,13 @@ import android.app.Activity
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.os.Message
 import android.util.Log
 import android.view.View
-import android.widget.Button
 import android.widget.TextView
+import kotlinx.android.synthetic.main.activity_main.*
 
 
-class MainActivity : Activity(), BBoyFPSRunner.OnFPSUpdateListener, BBoyPosRunner.OnPosUpdateListener {
+class MainActivity : Activity() {
     companion object {
         private val TAG = MainActivity::class.java.simpleName
         private const val FPS_UPDATE = 1
@@ -27,19 +26,20 @@ class MainActivity : Activity(), BBoyFPSRunner.OnFPSUpdateListener, BBoyPosRunne
     private lateinit var posView: TextView
 
 
-    private val fpsInfo = BBoyFPS()
-    private val posInfo = BBoyInputEvent()
+    private val fpsInfo: BBoyFPS = BBoyFPS()
+    private val posInfo: BBoyInputEvent = BBoyInputEvent()
 
-    private val handler = object : Handler(Looper.getMainLooper()) {
-        override fun handleMessage(msg: Message) {
-            when (msg.what) {
-                FPS_UPDATE -> {
-                    updateFPSText(fpsInfo)
-                }
-                POS_UPDATE -> {
-                    updatePosText(posInfo)
-                }
+    private val handler = Handler(Looper.getMainLooper()) {
+        when (it.what) {
+            FPS_UPDATE -> {
+                updateFPSText(fpsInfo)
+                true
             }
+            POS_UPDATE -> {
+                updatePosText(posInfo)
+                true
+            }
+            else -> false
         }
     }
 
@@ -51,19 +51,16 @@ class MainActivity : Activity(), BBoyFPSRunner.OnFPSUpdateListener, BBoyPosRunne
         onWindowFocusChanged(true)
         setContentView(R.layout.activity_main)
 
-        surfaceView = findViewById(R.id.surface_view)
-        fpsView = findViewById(R.id.fps_text)
-        upsView = findViewById(R.id.ups_text)
-        trueupsView = findViewById(R.id.true_ups_text)
-        posView = findViewById(R.id.pos_text)
+        surfaceView = surface_view
+        fpsView = fps_text
+        upsView = ups_text
+        trueupsView = true_ups_text
+        posView = pos_text
 
         gameEngine = BBoyServiceProvider.getInstance().gameEngine
         gameEngine.runGameLoop()
 
-        val pause_button: Button = findViewById(R.id.pause_button)
         pause_button.setOnClickListener { gameEngine.pauseGameLoop() }
-
-        val resume_button: Button = findViewById(R.id.resume_button)
         resume_button.setOnClickListener { gameEngine.resumeGameLoop() }
     }
 
@@ -72,8 +69,16 @@ class MainActivity : Activity(), BBoyFPSRunner.OnFPSUpdateListener, BBoyPosRunne
         Log.d(TAG, "onStart")
 
         surfaceView.onResume()
-        gameEngine.initFPSRunner(fpsInfo, this)
-        gameEngine.initPosRunner(posInfo, this)
+        gameEngine.initFPSRunner(fpsInfo, object : BBoyFPSRunner.OnFPSUpdateListener {
+            override fun onFPSUpdate() {
+                handler.sendEmptyMessage(FPS_UPDATE)
+            }
+        })
+        gameEngine.initPosRunner(posInfo, object : BBoyPosRunner.OnPosUpdateListener {
+            override fun onPosUpdate() {
+                handler.sendEmptyMessage(POS_UPDATE)
+            }
+        })
     }
 
     override fun onStop() {
@@ -89,8 +94,8 @@ class MainActivity : Activity(), BBoyFPSRunner.OnFPSUpdateListener, BBoyPosRunne
         super.onDestroy()
         Log.d(TAG, "onDestroy")
 
-        // any occasion where onDestroy does not get called is when the process will be nuked from existance
-        // so the thread leaking doesn't seem possible
+        // any occasion where onDestroy does not get called is when the process will be nuked
+        // from existence so the thread leaking doesn't seem possible
         gameEngine.finishGameLoop()
     }
 
@@ -101,15 +106,6 @@ class MainActivity : Activity(), BBoyFPSRunner.OnFPSUpdateListener, BBoyPosRunne
             hideSystemUI()
         }
     }
-
-    override fun onFPSUpdate() {
-        handler.sendEmptyMessage(FPS_UPDATE)
-    }
-
-    override fun onPosUpdate() {
-        handler.sendEmptyMessage(POS_UPDATE)
-    }
-
 
     private fun hideSystemUI() {
         // Enables regular immersive mode.
@@ -134,17 +130,13 @@ class MainActivity : Activity(), BBoyFPSRunner.OnFPSUpdateListener, BBoyPosRunne
                 or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN)
     }
 
-    fun updateFPSText(fpsInfo: BBoyFPS?) {
-        fpsInfo?.let {
-            fpsView.text = "FPS: " + it.fps.toString()
-            upsView.text = "UPS: " + it.ups.toString()
-            trueupsView.text = "TRUE_UPS: " + it.true_ups.toString()
-        }
+    private fun updateFPSText(fpsInfo: BBoyFPS) {
+        fpsView.text = "FPS: " + fpsInfo.fps.toString()
+        upsView.text = "UPS: " + fpsInfo.ups.toString()
+        trueupsView.text = "TRUE_UPS: " + fpsInfo.true_ups.toString()
     }
 
-    fun updatePosText(posInfo: BBoyInputEvent?) {
-        posInfo?.let {
-            posView.text = "x: " + it.x.toString() + " | y: " + it.y.toString()
-        }
+    private fun updatePosText(posInfo: BBoyInputEvent) {
+        posView.text = "x: " + posInfo.x.toString() + " | y: " + posInfo.y.toString()
     }
 }

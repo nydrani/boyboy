@@ -31,7 +31,7 @@ class BBoyGameEngineInterface {
         }
 
         posRunner = BBoyPosRunner(posInfo, posUpdateListener)
-        // @TODO possible after shutdown that fpsRunner instance is expired
+        // @TODO possible after shutdown that posRunner instance is expired
         Thread(posRunner).start()
     }
 
