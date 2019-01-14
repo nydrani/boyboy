@@ -7,4 +7,6 @@
 
 float degToRads(float degrees);
 
+bool almostEquals(float a, float b);
+
 #endif //BOYBOY_TOOLS_H

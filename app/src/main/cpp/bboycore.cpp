@@ -38,10 +38,10 @@ static void storeEvent(struct EventItem);
 static void drawTouchDot();
 
 
-static auto boxVertices = {100.0f, 100.0f, 0.0f,
-                           100.0f, -100.0f, 0.0f,
-                           -100.0f, -100.0f, 0.0f,
-                           -100.0f, 100.0f, 0.0f};
+static auto boxVertices = {1.0f, 1.0f, 0.0f,
+                           1.0f, -1.0f, 0.0f,
+                           -1.0f, -1.0f, 0.0f,
+                           -1.0f, 1.0f, 0.0f};
 
 
 static auto triangleVertices = {sin(degToRads(0.0f)) * DOT_RADIUS, cos(degToRads(0.0f)) * DOT_RADIUS, 0.0f,
@@ -186,8 +186,13 @@ static double ups;
 static double true_ups;
 static double lag;
 
-static int width;
-static int height;
+static int screenWidth;
+static int screenHeight;
+static float screenRatioX;
+static float screenRatioY;
+
+static float worldWidth;
+static float worldHeight;
 
 static float dotRotation;
 
@@ -208,21 +213,20 @@ static Circle circle;
 static glm::vec3 circlePosition;
 // =========================
 
-
-struct PositionRange convertCoordToNormalisedRange(struct EventItem &position) {
-    float xRatio = position.x / width * 2 - 1;
-    float yRatio = position.y / height * 2 - 1;
+struct EventItem convertScreenCoordToWorldCoord(struct EventItem &position) {
+    float xPos = (position.x / screenRatioX) - (worldWidth / 2.0f);
+    float yPos = (position.y / screenRatioY) - (worldHeight / 2.0f);
 
     // negative y ratio since screen is top to bottom while coordinates is bottom to top
-    return { xRatio, -yRatio };
+    return { xPos, -yPos };
 }
 
-struct PositionRange convertCoordToRange(struct EventItem &position) {
-    float xRatio = position.x - width / 2;
-    float yRatio = position.y - height / 2;
+struct EventItem convertWorldCoodToScreenCoord(struct EventItem &position) {
+    float xPos = (position.x + (worldWidth / 2.0f)) * screenRatioX;
+    float yPos = (-position.y + (worldHeight / 2.0f)) * screenRatioY;
 
     // negative y ratio since screen is top to bottom while coordinates is bottom to top
-    return { xRatio, -yRatio };
+    return { xPos, yPos };
 }
 
 static double getElapsedTime(struct timespec &prevTime, struct timespec &curTime) {
@@ -333,8 +337,29 @@ static bool initOpenGLObjects() {
 static bool setupScreen(int w, int h) {
     LOGI("setupScreen(%d, %d)", w, h);
 
-    width = w;
-    height = h;
+    screenWidth = w;
+    screenHeight = h;
+
+    // get ratio
+    float aspectRatio = static_cast<float>(w) / static_cast<float>(h);
+    if (aspectRatio >= 1.0f) {
+        worldHeight = WORLD_SIZE / aspectRatio;
+        worldWidth = WORLD_SIZE;
+    } else {
+        worldHeight = WORLD_SIZE;
+        worldWidth = WORLD_SIZE * aspectRatio;
+    }
+
+
+    float convRatioY = screenHeight / worldHeight;
+    float convRatioX = screenWidth / worldWidth;
+
+    // check that the conversion ratios are almost equal
+    // so that the world looks good
+    assert(almostEquals(convRatioX, convRatioY));
+
+    screenRatioX = convRatioX;
+    screenRatioY = convRatioY;
 
     glViewport(0, 0, w, h);
     return !checkGlError("glViewport");
@@ -364,7 +389,7 @@ static void stepGame() {
 
     // update circle position
     if (yeeNum == 0) {
-        std::uniform_real_distribution<float> rngPos(-500.0f, 500.0f);
+        std::uniform_real_distribution<float> rngPos(-50.0f, 50.0f);
         float x = rngPos(rng);
         float y = rngPos(rng);
         circlePosition = glm::vec3(x, y, 0.0f);
@@ -416,7 +441,9 @@ static void resumeGame() {
 }
 
 static void storeEvent(struct EventItem event) {
-    inputBuffer.push(event);
+    // convert android xy coords to world coords
+    struct EventItem convertedEvent = convertScreenCoordToWorldCoord(event);
+    inputBuffer.push(convertedEvent);
 }
 
 static void processInput() {
@@ -466,19 +493,19 @@ static void renderFrame(double interpolation) {
 }
 
 static void drawTouchDot() {
-    struct PositionRange converted = convertCoordToRange(curPosition);
-
     // place ortho camera to bottom left as 0,0
     // glm::mat4 orthoMat = glm::ortho(0.0f, (float)width, 0.0f, (float)height);
 
-    // place ortho camera to 0,0 centre with total width 1080 and height 1920
+    // place ortho camera to 0,0 centre with world height and width with 16:9 ratio --> 160:90
     //
     //       960
     //        |
     // -540 --+-- 540
     //        |
     //      -960
-    glm::mat4 orthoMat = glm::ortho(-width/2.0f, width/2.0f, -height/2.0f, height/2.0f);
+
+    //      -960
+    glm::mat4 orthoMat = glm::ortho(-worldWidth/2.0f, worldWidth/2.0f, -worldHeight/2.0f, worldHeight/2.0f);
     glm::mat4 modelMat, mat;
 
     modelMat = glm::mat4(1.0f);
@@ -489,14 +516,14 @@ static void drawTouchDot() {
     glBindVertexArray(rectangleVAO);
     glDrawArrays(GL_LINE_LOOP, 0, 4);
 
-    // draw circle at random point between (-100, 100)
+    // draw circle at random point between (-50, 50)
     modelMat = glm::translate(glm::mat4(1.0f), circlePosition);
     mat = orthoMat * modelMat;
     glUniformMatrix4fv(mvpMatrixLoc, 1, GL_FALSE, glm::value_ptr(mat));
     circle.Draw();
 
     // translate the triangle to move it
-    modelMat = glm::translate(glm::mat4(1.0f), glm::vec3(converted.x, converted.y, 0.0f));
+    modelMat = glm::translate(glm::mat4(1.0f), glm::vec3(curPosition.x, curPosition.y, 0.0f));
     mat = orthoMat * modelMat;
     glUniformMatrix4fv(mvpMatrixLoc, 1, GL_FALSE, glm::value_ptr(mat));
 
@@ -636,11 +663,18 @@ JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_obtainPos(J
     // Get Field references
     jfieldID param1Field = env->GetFieldID(clazz, "x", "F");
     jfieldID param2Field = env->GetFieldID(clazz, "y", "F");
+    jfieldID param3Field = env->GetFieldID(clazz, "normX", "F");
+    jfieldID param4Field = env->GetFieldID(clazz, "normY", "F");
 
 
     // Set fields for object
-    env->SetFloatField(obj, param1Field, curPosition.x);
-    env->SetFloatField(obj, param2Field, curPosition.y);
+    struct EventItem converted = convertWorldCoodToScreenCoord(curPosition);
+    env->SetFloatField(obj, param1Field, converted.x);
+    env->SetFloatField(obj, param2Field, converted.y);
+
+    // convert to normalised position
+    env->SetFloatField(obj, param3Field, curPosition.x);
+    env->SetFloatField(obj, param4Field, curPosition.y);
 }
 
 JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_sendEvent(JNIEnv *env,

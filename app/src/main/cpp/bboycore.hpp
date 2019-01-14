@@ -32,24 +32,21 @@
 #define BILLION 1000000000
 #define BILLION_DOUBLE 1000000000.0
 #define M_PI_FLOAT 3.14159265358979323846f
+#define WORLD_SIZE 100
 
 #define POS_ATTRIB 0
 
-#define DOT_RADIUS 50.0f
+#define DOT_RADIUS 1.0f
 
 struct EventItem {
     float x;
     float y;
 };
 
-struct PositionRange {
-    float x;
-    float y;
-};
-
 bool checkGlError(const char *funcName);
 void printGLString(const char *name, GLenum s);
-struct PositionRange convertCoordToRange(struct EventItem &position);
+struct EventItem convertScreenCoordToWorldCoord(struct EventItem &position);
+struct EventItem convertWorldCoordToScreenCoord(struct EventItem &position);
 GLuint createShader(GLenum shaderType, const char *src);
 GLuint createProgram(const char *vtxSrc, const char *fragSrc);
 

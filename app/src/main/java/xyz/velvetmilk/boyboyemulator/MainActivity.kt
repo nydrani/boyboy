@@ -24,6 +24,7 @@ class MainActivity : Activity() {
     private lateinit var upsView: TextView
     private lateinit var trueupsView: TextView
     private lateinit var posView: TextView
+    private lateinit var normPosView: TextView
 
 
     private val fpsInfo: BBoyFPS = BBoyFPS()
@@ -56,6 +57,7 @@ class MainActivity : Activity() {
         upsView = ups_text
         trueupsView = true_ups_text
         posView = pos_text
+        normPosView = norm_pos_text
 
         gameEngine = BBoyServiceProvider.getInstance().gameEngine
         gameEngine.runGameLoop()
@@ -138,5 +140,6 @@ class MainActivity : Activity() {
 
     private fun updatePosText(posInfo: BBoyInputEvent) {
         posView.text = "x: " + posInfo.x.toString() + " | y: " + posInfo.y.toString()
+        normPosView.text = "norm x: " + posInfo.normX.toString() + " | norm y: " + posInfo.normY.toString()
     }
 }

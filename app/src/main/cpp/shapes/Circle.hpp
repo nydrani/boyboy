@@ -15,7 +15,7 @@ class Circle {
 public:
     Circle(Vector3, float, int);
     Circle(Vector3 origin, float radius) : Circle(origin, radius, CIRCLE_DEFAULT_PARTITIONS) {}
-    Circle() : Circle(Vector3(), 100.0f) {}
+    Circle() : Circle(Vector3(), 1.0f) {}
     ~Circle() {}
     void Draw();
 private:
