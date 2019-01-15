@@ -9,4 +9,4 @@ add_subdirectory(glm)
 add_library(bboyutils STATIC ${TOOLS_SOURCE} ${TOOLS_HEADER} ${SHAPES_SOURCE} ${SHAPES_HEADER})
 
 target_link_libraries(bboyutils
-                      GLESv3)
+                      GLESv3 -v)

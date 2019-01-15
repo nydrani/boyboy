@@ -8,6 +8,7 @@
 #include <vector>
 #include <GLES3/gl32.h>
 #include "Vector3.hpp"
+#include "../glm/ext.hpp"
 
 #define CIRCLE_DEFAULT_PARTITIONS 100
 

@@ -43,7 +43,8 @@ struct EventItem {
     float y;
 };
 
-bool checkGlError(const char *funcName);
+bool checkGLError(const char *funcName);
+void printGLErrors();
 void printGLString(const char *name, GLenum s);
 struct EventItem convertScreenCoordToWorldCoord(struct EventItem &position);
 struct EventItem convertWorldCoordToScreenCoord(struct EventItem &position);
