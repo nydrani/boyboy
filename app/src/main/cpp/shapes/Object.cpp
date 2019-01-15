@@ -3,9 +3,9 @@
 //
 
 #include <vector>
+#include "core/bboycore.hpp"
 
 #include "Object.hpp"
-#include "../bboycore.hpp"
 
 Object::Object(glm::vec3 translation, glm::quat rotation, glm::vec3 scale) {
     // setup obj

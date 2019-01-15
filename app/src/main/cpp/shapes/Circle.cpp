@@ -2,10 +2,11 @@
 // Created by Victor Zhang on 11/9/18.
 //
 
-#include "Circle.hpp"
-#include "../tools/tools.hpp"
-#include "../bboycore.hpp"
 #include <cmath>
+#include "core/bboycore.hpp"
+#include "tools/tools.hpp"
+
+#include "Circle.hpp"
 
 Circle::Circle(Vector3 origin, float radius, int partitions)
 {

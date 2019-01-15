@@ -4,8 +4,8 @@
 
 #include <limits>
 #include <cmath>
+#include "core/bboycore.hpp"
 #include "tools.hpp"
-#include "../bboycore.hpp"
 
 float degToRads(float degrees) {
     return degrees * M_PI_FLOAT / 180;

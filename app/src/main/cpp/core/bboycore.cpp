@@ -10,15 +10,17 @@
 
 #include <GLES3/gl32.h>
 #include <GLES3/gl3ext.h>
+#include <glm/glm.hpp>
+#include <glm/ext.hpp>
+
+#include "tools/tools.hpp"
+
+#include "shapes/Circle.hpp"
+#include "shapes/Object.hpp"
 
 #include "bboycore.hpp"
 
 
-#include "glm/glm.hpp"
-
-#include "shapes/Circle.hpp"
-#include "shapes/Object.hpp"
-#include "tools/tools.hpp"
 
 static void initProgram();
 static bool initOpenGL();
