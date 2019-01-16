@@ -7,9 +7,9 @@ import kotlinx.android.parcel.Parcelize
  * @author Victor Zhang
  */
 @Parcelize
-data class BBoyFPS(var fps: Double = 0.0, var ups: Double = 0.0, var true_ups: Double = 0.0) : Parcelable {
+data class BBoyFPS(var fps: Double = 0.0, var ups: Double = 0.0, var true_ups: Double = 0.0, var frame: Long = 0) : Parcelable {
 
     override fun toString(): String {
-        return fps.toString() + " " + ups.toString() + " " + true_ups.toString()
+        return fps.toString() + " " + ups.toString() + " " + true_ups.toString() + " " + frame.toString()
     }
 }

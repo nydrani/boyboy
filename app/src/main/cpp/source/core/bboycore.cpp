@@ -214,6 +214,8 @@ static std::queue<struct EventItem> inputBuffer;
 static std::thread gameLoop;
 static bool running;
 
+static uint64_t currentFrame;
+
 static GLuint triangleBuffer, rectangleBuffer;
 static GLuint triangleVAO, rectangleVAO;
 static GLint mvpMatrixLoc;
@@ -276,6 +278,8 @@ static void initProgram() {
     true_ups = 0.0;
     lag = 0.0;
     dotRotation = 0.0f;
+
+    currentFrame = 0;
 
     curPosition = { 0.0f, 0.0f };
 
@@ -383,6 +387,8 @@ static bool setupScreen(int w, int h) {
 }
 
 static void stepGame() {
+    currentFrame++;
+
     yeeNum++;
     yeeNum %= 60;
 
@@ -677,12 +683,14 @@ JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_obtainFPS(J
     jfieldID param1Field = env->GetFieldID(clazz, "fps", "D");
     jfieldID param2Field = env->GetFieldID(clazz, "ups", "D");
     jfieldID param3Field = env->GetFieldID(clazz, "true_ups", "D");
+    jfieldID param4Field = env->GetFieldID(clazz, "frame", "J");
 
 
     // Set fields for object
     env->SetDoubleField(obj, param1Field, fps);
     env->SetDoubleField(obj, param2Field, ups);
     env->SetDoubleField(obj, param3Field, true_ups);
+    env->SetLongField(obj, param4Field, currentFrame);
 }
 
 JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_obtainPos(JNIEnv *env,
