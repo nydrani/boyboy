@@ -11,9 +11,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_VERBOSE_MAKEFILE on)
 
 # TODO update this to be better later lmao
-include_directories(.)
+include_directories(${PROJECT_SOURCE_DIR}/libs)
+include_directories(${PROJECT_SOURCE_DIR}/source)
 
-add_subdirectory(glm)
-add_subdirectory(tools)
-add_subdirectory(shapes)
-add_subdirectory(core)
+add_subdirectory(libs)
+add_subdirectory(source)

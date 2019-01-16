@@ -2,16 +2,18 @@
 #include <thread>
 #include <queue>
 #include <cmath>
+#include <ctime>
 #include <random>
 #include <iostream>
 
 #include <jni.h>
-#include <time.h>
 
 #include <GLES3/gl32.h>
 #include <GLES3/gl3ext.h>
-#include <glm/glm.hpp>
+
 #include <glm/ext.hpp>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include "tools/tools.hpp"
 
@@ -62,11 +64,11 @@ static auto fragmentShader =
                 "}\n";
 
 void printGLString(const char *name, GLenum s) {
-    const char *v = (const char *) glGetString(s);
+    auto *v = glGetString(s);
     LOGI("GL %s = %s\n", name, v);
 }
 
-bool checkGLError(const char* funcName) {
+bool checkGLError(const char *funcName) {
     GLint err = glGetError();
 
     if (err != GL_NO_ERROR) {
@@ -526,7 +528,7 @@ static void drawTouchDot() {
     glm::mat4 orthoMat = glm::ortho(-worldWidth/2.0f, worldWidth/2.0f, -worldHeight/2.0f, worldHeight/2.0f);
     glm::mat4 modelMat, mat;
 
-    modelMat = glm::mat4(1);
+    modelMat = glm::mat4(1.0f);
     mat = orthoMat * modelMat;
     glUniformMatrix4fv(mvpMatrixLoc, 1, GL_FALSE, glm::value_ptr(mat));
 
@@ -587,12 +589,13 @@ static void shutdown() {
     glDeleteVertexArrays(1, &rectangleVAO);
 }
 
-JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved)
+extern "C"
 {
+JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
     LOGV(__FUNCTION__, "onLoad");
 
-    JNIEnv* env;
-    if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
+    JNIEnv *env;
+    if (vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6) != JNI_OK) {
         return -1;
     }
 
@@ -600,14 +603,14 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved)
 }
 
 JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_init(JNIEnv *env,
-                                                                             jobject obj) {
+                                                                          jclass obj) {
     LOGV(__FUNCTION__, "init");
 
     initProgram();
 }
 
 JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_run(JNIEnv *env,
-                                                                             jobject obj) {
+                                                                         jclass obj) {
     LOGV(__FUNCTION__, "init");
 
     running = true;
@@ -615,7 +618,7 @@ JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_run(JNIEnv 
 }
 
 JNIEXPORT jboolean JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_initOpenGL(JNIEnv *env,
-                                                                             jobject obj) {
+                                                                                    jclass obj) {
     LOGV(__FUNCTION__, "initOpenGL");
 
     bool success = initOpenGL();
@@ -626,16 +629,16 @@ JNIEXPORT jboolean JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_initOpe
 }
 
 JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_setup(JNIEnv *env,
-                                                                              jobject obj,
-                                                                              jint width,
-                                                                              jint height) {
+                                                                           jclass obj,
+                                                                           jint width,
+                                                                           jint height) {
     LOGV(__FUNCTION__, "setup");
 
     setupScreen(width, height);
 }
 
 JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_render(JNIEnv *env,
-                                                                               jobject obj) {
+                                                                            jclass obj) {
     LOGV(__FUNCTION__, "render");
 
     // interpolate the frame rendered between current and next [0-1]
@@ -643,28 +646,28 @@ JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_render(JNIE
 }
 
 JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_pause(JNIEnv *env,
-                                                                               jobject obj) {
+                                                                           jclass obj) {
     LOGV(__FUNCTION__, "pause");
 
     pauseGame();
 }
 
 JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_resume(JNIEnv *env,
-                                                                              jobject obj) {
+                                                                            jclass obj) {
     LOGV(__FUNCTION__, "resume");
 
     resumeGame();
 }
 
 JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_shutdown(JNIEnv *env,
-                                                                               jobject obj) {
+                                                                              jclass obj) {
     LOGV(__FUNCTION__, "shutdown");
 
     shutdown();
 }
 
 JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_obtainFPS(JNIEnv *env,
-                                                                               jobject javaThis,
+                                                                               jclass javaThis,
                                                                                jobject obj) {
     LOGV(__FUNCTION__, "obtainFPS");
 
@@ -683,7 +686,7 @@ JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_obtainFPS(J
 }
 
 JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_obtainPos(JNIEnv *env,
-                                                                               jobject javaThis,
+                                                                               jclass javaThis,
                                                                                jobject obj) {
     LOGV(__FUNCTION__, "obtainFPS");
 
@@ -707,7 +710,7 @@ JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_obtainPos(J
 }
 
 JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_sendEvent(JNIEnv *env,
-                                                                               jobject javaThis,
+                                                                               jclass javaThis,
                                                                                jobject obj) {
     LOGV(__FUNCTION__, "sendEvent");
 
@@ -722,9 +725,10 @@ JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_sendEvent(J
     jfloat y = env->GetFloatField(obj, param2Field);
 
     // convert jobject to struct EventItem
-    struct EventItem item = { x, y };
+    struct EventItem item = {x, y};
 
     storeEvent(item);
     // object class is a MotionEvent
     // store event into input buffer
+}
 }
