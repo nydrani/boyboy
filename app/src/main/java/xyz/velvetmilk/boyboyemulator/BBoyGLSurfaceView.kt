@@ -2,31 +2,48 @@ package xyz.velvetmilk.boyboyemulator
 
 import android.content.Context
 import android.opengl.EGL14
+import android.opengl.GLES10
 import android.opengl.GLSurfaceView
 import android.util.AttributeSet
 import android.util.Log
 import android.view.MotionEvent
-import android.view.View
 import javax.microedition.khronos.egl.EGL10
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.egl.EGLContext
 import javax.microedition.khronos.egl.EGLDisplay
 import javax.microedition.khronos.opengles.GL10
+import kotlin.math.absoluteValue
+import kotlin.math.roundToInt
 
 /**
  * @author Victor Zhang
  */
 class BBoyGLSurfaceView: GLSurfaceView {
-    private val renderer = BBoyGLSurfaceRenderer()
+    private val renderer = BBoyGLSurfaceRenderer(object : BBoyGLSurfaceRenderer.SurfaceCreatedListener {
+        override fun onSurfaceCreated() {
+            openGLVersion = GLES10.glGetString(GLES10.GL_VERSION)
+            openGLRenderer = GLES10.glGetString(GLES10.GL_RENDERER)
+            openGLExtensions = GLES10.glGetString(GLES10.GL_EXTENSIONS)
+
+            openGLReadyListener.onOpenGLReady()
+        }
+    })
     private val factory = BBoyEGLContextFactory()
     private val configChooser = BBoyEGLConfigChooser()
 
-    private var mPreviousX: Float = 0f
-    private var mPreviousY: Float = 0f
+    private var openGLReadyListener: OpenGLReadyListener = object : OpenGLReadyListener {
+        override fun onOpenGLReady() {
+            Log.d(TAG, "onOpenGLReady")
+        }
+    }
 
-    private var touchdownX: Float = 0f
-    private var touchdownY: Float = 0f
+    interface OpenGLReadyListener {
+        fun onOpenGLReady()
+    }
 
+    lateinit var openGLVersion: String
+    lateinit var openGLRenderer: String
+    lateinit var openGLExtensions: String
 
     constructor(context: Context): super(context)
     constructor(context: Context, attributeSet: AttributeSet): super(context, attributeSet)
@@ -41,7 +58,6 @@ class BBoyGLSurfaceView: GLSurfaceView {
 
     companion object {
         private val TAG = BBoyGLSurfaceView::class.java.simpleName
-        private const val TOUCH_SCALE_FACTOR: Float = 180.0f / 320f
 
         private fun checkEglError(prompt: String) {
             var error: Int
@@ -56,41 +72,51 @@ class BBoyGLSurfaceView: GLSurfaceView {
         }
     }
 
+    fun addOpenGLReadyListener(listener: OpenGLReadyListener) {
+        openGLReadyListener = listener
+    }
+
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         super.onTouchEvent(event)
 
-        val x: Float = event.x
-        val y: Float = event.y
+        var x: Float = event.x * event.xPrecision
+        var y: Float = event.y * event.yPrecision
+
+        // if (x is almost an int) --> use int version
+        // @TODO fix epsilon to a better value than constant recalculation
+        // @TODO change to multiple of ulp if required???
+        // @TODO optmise if this is really slow
+        val roundedX = x.roundToInt().toFloat()
+        val roundedY = y.roundToInt().toFloat()
+
+        var epsilon = Math.ulp(roundedX)
+        if (roundedX != x && (roundedX - x).absoluteValue <= epsilon) {
+            x = roundedX
+        }
+
+        epsilon = Math.ulp(roundedY)
+        if (roundedY != y && (roundedY - y).absoluteValue <= epsilon) {
+            y = roundedY
+        }
+
+        Log.d(TAG, "x: " + event.x * event.xPrecision + " | y: " + event.y * event.xPrecision)
 
         BBoyJNILib.sendEvent(BBoyInputEvent(x, y))
 
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
+                //Log.d(TAG, "x: " + event.x + " | y: " + event.y + " | motionevent: action_down")
                 performClick()
-
-                touchdownX = event.x
-                touchdownY = event.y
 
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
-                var dx: Float = x - mPreviousX
-                var dy: Float = y - mPreviousY
-
-                // reverse direction of rotation above the mid-line
-                if (y > height / 2) {
-                    dx *= -1
-                }
-
-                // reverse direction of rotation to left of the mid-line
-                if (x < width / 2) {
-                    dy *= -1
-                }
-
-                renderer.angle += (dx + dy) * TOUCH_SCALE_FACTOR
-
-                mPreviousX = x
-                mPreviousY = y
+                //Log.d(TAG, "x: " + event.x + " | y: " + event.y + " | motionevent: action_move")
+                return true
+            }
+            MotionEvent.ACTION_UP -> {
+                //Log.d(TAG, "x: " + event.x + " | y: " + event.y + " | motionevent: action_up")
                 return true
             }
         }
@@ -106,14 +132,17 @@ class BBoyGLSurfaceView: GLSurfaceView {
         return true
     }
 
-    class BBoyGLSurfaceRenderer: GLSurfaceView.Renderer {
+    class BBoyGLSurfaceRenderer(listener: SurfaceCreatedListener): GLSurfaceView.Renderer {
         private val gameEngine = BBoyServiceProvider.getInstance().gameEngine
+        private val surfaceCreatedListener: SurfaceCreatedListener = listener
 
-        @Volatile
-        var angle: Float = 0f
+        interface SurfaceCreatedListener {
+            fun onSurfaceCreated()
+        }
 
         override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
             gameEngine.initOpenGL()
+            surfaceCreatedListener.onSurfaceCreated()
         }
 
         override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {

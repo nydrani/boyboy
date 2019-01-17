@@ -20,6 +20,7 @@ class MainActivity : Activity() {
     private lateinit var surfaceView: BBoyGLSurfaceView
     private lateinit var gameEngine: BBoyGameEngineInterface
 
+    private lateinit var openGLDebugView: TextView
     private lateinit var fpsView: TextView
     private lateinit var upsView: TextView
     private lateinit var trueupsView: TextView
@@ -54,12 +55,21 @@ class MainActivity : Activity() {
         setContentView(R.layout.activity_main)
 
         surfaceView = surface_view
+        openGLDebugView = opengl_version_text
         fpsView = fps_text
         upsView = ups_text
         trueupsView = true_ups_text
         curFrameView = cur_frame_text
         posView = pos_text
         normPosView = norm_pos_text
+
+        surfaceView.addOpenGLReadyListener(object : BBoyGLSurfaceView.OpenGLReadyListener {
+            override fun onOpenGLReady() {
+                runOnUiThread {
+                    setOpenGLDebugInfo()
+                }
+            }
+        })
 
 
         gameEngine = BBoyServiceProvider.getInstance().gameEngine
@@ -133,6 +143,13 @@ class MainActivity : Activity() {
         window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                 or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                 or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN)
+    }
+
+    private fun setOpenGLDebugInfo() {
+        val version = surfaceView.openGLVersion
+        val renderer = surfaceView.openGLRenderer
+
+        openGLDebugView.text = version + "\n" + renderer
     }
 
     private fun updateFPSText(fpsInfo: BBoyFPS) {

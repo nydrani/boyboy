@@ -47,6 +47,7 @@ class BBoyGameEngineInterface {
         if (!BBoyJNILib.initOpenGL()) {
             Log.w(TAG, "Failed to initialise OpenGL program!")
         }
+        BBoyJNILib.printOpenGLInfo()
     }
 
     fun initGameLoop() {

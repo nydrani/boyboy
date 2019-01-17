@@ -1,9 +1,11 @@
 package xyz.velvetmilk.boyboyemulator
 
+import android.opengl.GLES10
 import android.opengl.GLES32
 import android.util.Log
 import android.view.MotionEvent
 import java.nio.IntBuffer
+import javax.microedition.khronos.opengles.GL10
 
 /**
  * @author Victor Zhang
@@ -15,8 +17,6 @@ class BBoyJNILib {
 
         init {
             System.loadLibrary("bboycore")
-
-            //printOpenGLInfo()
         }
 
         @JvmStatic
@@ -52,17 +52,18 @@ class BBoyJNILib {
         @JvmStatic
         external fun sendEvent(event: BBoyInputEvent)
 
-        private fun printOpenGLInfo() {
+        fun printOpenGLInfo() {
             val buffer = IntBuffer.allocate(1)
 
-            val extensions = GLES32.glGetString(GLES32.GL_EXTENSIONS)
-            val version = GLES32.glGetString(GLES32.GL_VERSION)
-            val renderer = GLES32.glGetString(GLES32.GL_RENDERER)
+            val extensions = GLES10.glGetString(GLES10.GL_EXTENSIONS)
+            val version = GLES10.glGetString(GLES10.GL_VERSION)
+            val renderer = GLES10.glGetString(GLES10.GL_RENDERER)
 
-            GLES32.glGetIntegerv(GLES32.GL_MAJOR_VERSION, buffer)
-            val majorVersion = buffer[0]
-            GLES32.glGetIntegerv(GLES32.GL_MINOR_VERSION, buffer)
-            val minorVersion = buffer[0]
+            // @NOTE only for opengles 3.2 (api 24+)
+//            GLES32.glGetIntegerv(GLES32.GL_MAJOR_VERSION, buffer)
+//            val majorVersion = buffer[0]
+//            GLES32.glGetIntegerv(GLES32.GL_MINOR_VERSION, buffer)
+//            val minorVersion = buffer[0]
 
             val strBuilder = StringBuilder()
             strBuilder.append("Extensions: ")
@@ -74,11 +75,11 @@ class BBoyJNILib {
             strBuilder.append("Version: ")
             strBuilder.append(version)
             strBuilder.append("\n")
-            strBuilder.append("VersionCode: ")
-            strBuilder.append(majorVersion)
-            strBuilder.append(".")
-            strBuilder.append(minorVersion)
-            strBuilder.append("\n")
+//            strBuilder.append("VersionCode: ")
+//            strBuilder.append(majorVersion)
+//            strBuilder.append(".")
+//            strBuilder.append(minorVersion)
+//            strBuilder.append("\n")
 
             Log.d(TAG, strBuilder.toString())
         }

@@ -94,7 +94,7 @@ GLuint createShader(GLenum shaderType, const char *src) {
         return 0;
     }
 
-    glShaderSource(shader, 1, &src, NULL);
+    glShaderSource(shader, 1, &src, nullptr);
     glCompileShader(shader);
 
     GLint compiled = GL_FALSE;
@@ -105,10 +105,10 @@ GLuint createShader(GLenum shaderType, const char *src) {
         glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &infoLogLen);
 
         if (infoLogLen > 0) {
-            GLchar *infoLog = (GLchar *) malloc((size_t) infoLogLen);
+            auto* infoLog = (GLchar*) malloc((size_t) infoLogLen);
 
             if (infoLog) {
-                glGetShaderInfoLog(shader, infoLogLen, NULL, infoLog);
+                glGetShaderInfoLog(shader, infoLogLen, nullptr, infoLog);
                 LOGE("Could not compile %s shader:\n%s\n",
                      shaderType == GL_VERTEX_SHADER ? "vertex" : "fragment",
                      infoLog);
@@ -165,9 +165,9 @@ GLuint createProgram(const char *vtxSrc, const char *fragSrc) {
         glGetProgramiv(program, GL_INFO_LOG_LENGTH, &infoLogLen);
 
         if (infoLogLen) {
-            GLchar* infoLog = (GLchar*) malloc((size_t) infoLogLen);
+            auto* infoLog = (GLchar*) malloc((size_t) infoLogLen);
             if (infoLog) {
-                glGetProgramInfoLog(program, infoLogLen, NULL, infoLog);
+                glGetProgramInfoLog(program, infoLogLen, nullptr, infoLog);
                 LOGE("Could not link program:\n%s\n", infoLog);
                 free(infoLog);
             }
@@ -208,8 +208,10 @@ static float worldHeight;
 static float dotRotation;
 
 static struct EventItem curPosition;
+static struct EventItem rawPosition;
 
 static std::queue<struct EventItem> inputBuffer;
+static std::queue<struct EventItem> rawInputBuffer;
 
 static std::thread gameLoop;
 static bool running;
@@ -227,20 +229,28 @@ static Object originPoint;
 static glm::vec3 circlePosition;
 // =========================
 
+// normalization formula : x between [a, b]
+// https://stats.stackexchange.com/questions/178626/how-to-normalize-data-between-1-and-1
 struct EventItem convertScreenCoordToWorldCoord(struct EventItem &position) {
-    float xPos = (position.x / screenRatioX) - (worldWidth / 2.0f);
-    float yPos = (position.y / screenRatioY) - (worldHeight / 2.0f);
+    // need to -1 in width and height for 0th offset
+    float xPos = worldWidth * position.x / (screenWidth - 1) - (worldWidth / 2);
+    float yPos = worldHeight * position.y / (screenHeight - 1) - (worldHeight / 2);
+    // old incorrect maths with off by 1 error
+    //float xPos = (position.x / screenRatioX) - (worldWidth / 2.0f);
+    //float yPos = (position.y / screenRatioY) - (worldHeight / 2.0f);
 
     // negative y ratio since screen is top to bottom while coordinates is bottom to top
     return { xPos, -yPos };
 }
 
 struct EventItem convertWorldCoordToScreenCoord(struct EventItem &position) {
-    float xPos = (position.x + (worldWidth / 2.0f)) * screenRatioX;
-    float yPos = (-position.y + (worldHeight / 2.0f)) * screenRatioY;
+    float xPos = (screenWidth - 1) * (position.x + worldWidth / 2) / worldWidth;
+    float yPos = (screenHeight - 1) * (position.y + worldHeight / 2) / worldHeight;
+    //float xPos = (position.x + (worldWidth / 2.0f)) * screenRatioX;
+    //float yPos = (-position.y + (worldHeight / 2.0f)) * screenRatioY;
 
     // negative y ratio since screen is top to bottom while coordinates is bottom to top
-    return { xPos, yPos };
+    return { xPos, -yPos };
 }
 
 static double getElapsedTime(struct timespec &prevTime, struct timespec &curTime) {
@@ -282,6 +292,7 @@ static void initProgram() {
     currentFrame = 0;
 
     curPosition = { 0.0f, 0.0f };
+    rawPosition = { 0.0f, 0.0f };
 
     rng.seed(std::random_device()());
 
@@ -467,6 +478,7 @@ static void storeEvent(struct EventItem event) {
     // convert android xy coords to world coords
     struct EventItem convertedEvent = convertScreenCoordToWorldCoord(event);
     inputBuffer.push(convertedEvent);
+    rawInputBuffer.push(event);
 }
 
 static void processInput() {
@@ -484,6 +496,23 @@ static void processInput() {
 
     curPosition.x = s.x;
     curPosition.y = s.y;
+}
+
+static void processRawInput() {
+    if (rawInputBuffer.empty()) {
+        return;
+    }
+
+    struct EventItem s = rawInputBuffer.front();
+    rawInputBuffer.pop();
+
+    // ignore input if paused
+    if (paused) {
+        return;
+    }
+
+    rawPosition.x = s.x;
+    rawPosition.y = s.y;
 }
 
 static void renderFrame(double interpolation) {
@@ -570,7 +599,9 @@ static void drawTouchDot() {
 
 static void runGameLoop() {
     while (running) {
+        // @TODO check if there is an issue here when game runs slower than render
         processInput();
+        processRawInput();
 
         if (!paused) {
             updateGame();
@@ -595,8 +626,7 @@ static void shutdown() {
     glDeleteVertexArrays(1, &rectangleVAO);
 }
 
-extern "C"
-{
+extern "C" {
 JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
     LOGV(__FUNCTION__, "onLoad");
 
@@ -708,9 +738,11 @@ JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_obtainPos(J
 
 
     // Set fields for object
-    struct EventItem converted = convertWorldCoordToScreenCoord(curPosition);
-    env->SetFloatField(obj, param1Field, converted.x);
-    env->SetFloatField(obj, param2Field, converted.y);
+    env->SetFloatField(obj, param1Field, rawPosition.x);
+    env->SetFloatField(obj, param2Field, rawPosition.y);
+//    struct EventItem converted = convertWorldCoordToScreenCoord(curPosition);
+//    env->SetFloatField(obj, param1Field, converted.x);
+//    env->SetFloatField(obj, param2Field, converted.y);
 
     // convert to normalised position
     env->SetFloatField(obj, param3Field, curPosition.x);
@@ -735,8 +767,8 @@ JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_sendEvent(J
     // convert jobject to struct EventItem
     struct EventItem item = {x, y};
 
-    storeEvent(item);
     // object class is a MotionEvent
     // store event into input buffer
+    storeEvent(item);
 }
 }
