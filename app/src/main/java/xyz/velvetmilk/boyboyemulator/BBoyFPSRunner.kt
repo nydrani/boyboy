@@ -14,7 +14,7 @@ class BBoyFPSRunner(private val fpsInfo: BBoyFPS,
             fpsUpdateListener.onFPSUpdate()
 
             try {
-                Thread.sleep(100)
+                Thread.sleep(20)
             } catch (e: InterruptedException) {
                 e.printStackTrace()
             }

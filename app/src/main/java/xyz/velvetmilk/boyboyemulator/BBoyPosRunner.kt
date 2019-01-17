@@ -14,7 +14,7 @@ class BBoyPosRunner(private val inputInfo: BBoyInputEvent,
             posUpdateListener.onPosUpdate()
 
             try {
-                Thread.sleep(100)
+                Thread.sleep(20)
             } catch (e: InterruptedException) {
                 e.printStackTrace()
             }
