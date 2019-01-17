@@ -2,6 +2,7 @@ package xyz.velvetmilk.boyboyemulator
 
 import android.content.Context
 import android.opengl.EGL14
+import android.opengl.EGLExt
 import android.opengl.GLES10
 import android.opengl.GLSurfaceView
 import android.util.AttributeSet
@@ -187,7 +188,8 @@ class BBoyGLSurfaceView: GLSurfaceView {
                 EGL14.EGL_RED_SIZE, 4,
                 EGL14.EGL_GREEN_SIZE, 4,
                 EGL14.EGL_BLUE_SIZE, 4,
-                EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
+                EGL14.EGL_RENDERABLE_TYPE,
+                EGLExt.EGL_OPENGL_ES3_BIT_KHR,
                 EGL14.EGL_NONE)
 
         override fun chooseConfig(egl: EGL10?, display: EGLDisplay?): EGLConfig {

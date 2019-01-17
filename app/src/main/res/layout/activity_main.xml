@@ -7,6 +7,13 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/debug_info_split"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintGuide_percent="0.5"/>
+
     <xyz.velvetmilk.boyboyemulator.BBoyGLSurfaceView
         android:id="@+id/surface_view"
         android:layout_width="match_parent"
@@ -18,18 +25,21 @@
 
     <TextView
         android:id="@+id/opengl_version_text"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:textColor="@color/colorAccent"
         android:gravity="end"
         app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/debug_info_split"
         app:layout_constraintEnd_toEndOf="parent"/>
 
     <TextView
         android:id="@+id/cur_frame_text"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:textColor="@color/colorAccent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/debug_info_split"
         app:layout_constraintTop_toTopOf="parent" />
 
     <TextView
@@ -37,6 +47,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:textColor="@color/colorAccent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/debug_info_split"
         app:layout_constraintTop_toBottomOf="@+id/cur_frame_text" />
 
     <TextView
@@ -44,6 +56,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:textColor="@color/colorAccent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/debug_info_split"
         app:layout_constraintTop_toBottomOf="@+id/fps_text" />
 
     <TextView
@@ -51,6 +65,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:textColor="@color/colorAccent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/debug_info_split"
         app:layout_constraintTop_toBottomOf="@+id/ups_text" />
 
 
@@ -59,6 +75,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:textColor="@color/colorAccent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/debug_info_split"
         app:layout_constraintTop_toBottomOf="@+id/true_ups_text" />
 
     <TextView
@@ -66,6 +84,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:textColor="@color/colorAccent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/debug_info_split"
         app:layout_constraintTop_toBottomOf="@+id/pos_text" />
 
     <Button
