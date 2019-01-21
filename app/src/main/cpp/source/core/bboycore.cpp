@@ -4,6 +4,7 @@
 #include <cmath>
 #include <ctime>
 #include <random>
+#include <memory>
 #include <iostream>
 
 #include <jni.h>
@@ -360,6 +361,10 @@ static bool initOpenGLObjects() {
     originPoint = Object();
     originPoint.translation = glm::vec3(0, 10, 0);
 
+    auto childObj = std::make_unique<Object>();
+    childObj->translation = glm::vec3(10, 0, 0);
+    originPoint.addChild(std::move(childObj));
+
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -428,6 +433,9 @@ static void stepGame() {
         float y = rngPos(rng);
         circlePosition = glm::vec3(x, y, 0);
     }
+
+    // update objects
+    originPoint.Update();
 }
 
 static void updateTime() {
@@ -459,10 +467,8 @@ static void updateGame() {
 
     if (updateCounter > 0) {
         ups = MOVING_AVERAGE_ALPHA * ups + (1.0 - MOVING_AVERAGE_ALPHA) * updateCounter / elapsed;
-        LOGD("UPS: %f", ups);
 
         true_ups = MOVING_AVERAGE_ALPHA * true_ups + (1.0 - MOVING_AVERAGE_ALPHA) / elapsed;
-        LOGD("TRUE_UPS: %f", true_ups);
     }
 }
 
@@ -528,9 +534,6 @@ static void renderFrame(double interpolation) {
     // calculate fps here
     fps = MOVING_AVERAGE_ALPHA * fps + (1.0 - MOVING_AVERAGE_ALPHA) / elapsed;
 
-    LOGD("FPS: %f", fps);
-
-
     // interpolate bgColor
     GLfloat interpBgColor = bgColor + colorUpdate * (float)interpolation;
 
@@ -587,11 +590,9 @@ static void drawTouchDot() {
     glDrawArrays(GL_TRIANGLES, 0, 3);
 
     // draw objects with a scene graph (origin point at 10.0f on y axis)
-    modelMat = glm::translate(glm::mat4(1), originPoint.translation);
-    modelMat = glm::rotate(modelMat, degToRads(dotRotation), glm::vec3(0, 0, 1));
+    modelMat = glm::mat4(1.0f);
     mat = orthoMat * modelMat;
-    glUniformMatrix4fv(mvpMatrixLoc, 1, GL_FALSE, glm::value_ptr(mat));
-    originPoint.Draw();
+    originPoint.Draw(mat, mvpMatrixLoc);
 
 
     glBindVertexArray(0);
