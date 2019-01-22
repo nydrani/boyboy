@@ -15,6 +15,7 @@
 #include <glm/ext.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <set>
 
 #include "tools/tools.hpp"
 
@@ -47,22 +48,18 @@ static auto boxVertices = {1.0f, 1.0f, 0.0f,
                            -1.0f, -1.0f, 0.0f,
                            -1.0f, 1.0f, 0.0f};
 
-
-static auto triangleVertices = {sin(degToRads(240.0f)) * DOT_RADIUS, cos(degToRads(240.0f)) * DOT_RADIUS, 0.0f,
-                                sin(degToRads(120.0f)) * DOT_RADIUS, cos(degToRads(120.0f)) * DOT_RADIUS, 0.0f,
-                                sin(degToRads(0.0f)) * DOT_RADIUS, cos(degToRads(0.0f)) * DOT_RADIUS, 0.0f};
-
-static auto vertexShader = "uniform mat4 uMVPMatrix;\n"
-                "attribute vec4 vPosition;\n"
-                "void main() {\n"
-                "  gl_Position = uMVPMatrix * vPosition;\n"
-                "}\n";
+static auto vertexShader =
+        "uniform mat4 uMVPMatrix;\n"
+        "attribute vec4 vPosition;\n"
+        "void main() {\n"
+        "  gl_Position = uMVPMatrix * vPosition;\n"
+        "}\n";
 
 static auto fragmentShader =
-        "precision mediump float;\n"
-                "void main() {\n"
-                "  gl_FragColor = vec4(0.0, 1.0, 0.0, 1.0);\n"
-                "}\n";
+        "uniform vec4 color;\n"
+        "void main() {\n"
+        "  gl_FragColor = color;\n"
+        "}\n";
 
 void printGLString(const char *name, GLenum s) {
     auto *v = glGetString(s);
@@ -200,8 +197,6 @@ static double lag;
 
 static int screenWidth;
 static int screenHeight;
-static float screenRatioX;
-static float screenRatioY;
 
 static float worldWidth;
 static float worldHeight;
@@ -217,16 +212,20 @@ static std::queue<struct EventItem> rawInputBuffer;
 static std::thread gameLoop;
 static bool running;
 
+static std::set<Object*> gameObjects;
+
 static uint64_t currentFrame;
 
-static GLuint triangleBuffer, rectangleBuffer;
-static GLuint triangleVAO, rectangleVAO;
+static GLuint rectangleBuffer;
+static GLuint rectangleVAO;
 static GLint mvpMatrixLoc;
+static GLint colorVecLoc;
 
 static std::mt19937 rng;
 
 static Circle circle;
 static Object originPoint;
+static Object touchPointer;
 static glm::vec3 circlePosition;
 // =========================
 
@@ -314,27 +313,21 @@ static bool initOpenGL() {
         LOGE("Could not create program.");
         return false;
     }
+    checkGLError("createProgram");
 
     // setup face culling
     glEnable(GL_CULL_FACE);
+    checkGLError("glEnable");
 
     // opengl init buffers and bind data
     // format of vertex attribute (POS_ATTRIB)
+    // @TODO figure out why there is an error here
     glVertexAttribFormat(POS_ATTRIB, 3, GL_FLOAT, GL_FALSE, 0);
     checkGLError("glVertexAttribFormat");
 
     // generate buffers
-    glGenBuffers(1, &triangleBuffer);
     glGenBuffers(1, &rectangleBuffer);
-    glGenVertexArrays(1, &triangleVAO);
     glGenVertexArrays(1, &rectangleVAO);
-
-    // bind triangle
-    glBindVertexArray(triangleVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, triangleBuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(*triangleVertices.begin()) * triangleVertices.size(), triangleVertices.begin(), GL_STATIC_DRAW);
-    glVertexAttribPointer(POS_ATTRIB, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(POS_ATTRIB);
 
     // bind rectangle
     glBindVertexArray(rectangleVAO);
@@ -351,7 +344,11 @@ static bool initOpenGL() {
     checkGLError("glUseProgram");
 
     mvpMatrixLoc = glGetUniformLocation(program, "uMVPMatrix");
+    colorVecLoc = glGetUniformLocation(program, "color");
+    LOGD("location of mvp matrix: %d", mvpMatrixLoc);
+    LOGD("location of color vec4: %d", colorVecLoc);
     glUniformMatrix4fv(mvpMatrixLoc, 1, GL_FALSE, glm::value_ptr(glm::mat4(1)));
+    glUniform4fv(colorVecLoc, 1, glm::value_ptr(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)));
 
     return true;
 }
@@ -359,9 +356,16 @@ static bool initOpenGL() {
 static bool initOpenGLObjects() {
     circle = Circle();
     originPoint = Object();
-    originPoint.translation = glm::vec3(0, 10, 0);
-
     auto childObj = std::make_unique<Object>();
+    touchPointer = Object();
+
+    // add to list of game objects
+    gameObjects.emplace(&originPoint);
+    gameObjects.emplace(&touchPointer);
+    gameObjects.emplace(childObj.get());
+
+    // modify objects
+    originPoint.translation = glm::vec3(0, 10, 0);
     childObj->translation = glm::vec3(10, 0, 0);
     originPoint.addChild(std::move(childObj));
 
@@ -386,17 +390,6 @@ static bool setupScreen(int w, int h) {
         worldHeight = WORLD_SIZE;
         worldWidth = WORLD_SIZE * aspectRatio;
     }
-
-
-    float convRatioY = screenHeight / worldHeight;
-    float convRatioX = screenWidth / worldWidth;
-
-    // check that the conversion ratios are almost equal
-    // so that the world looks good
-    assert(almostEquals(convRatioX, convRatioY));
-
-    screenRatioX = convRatioX;
-    screenRatioY = convRatioY;
 
     glViewport(0, 0, w, h);
     return !checkGLError("glViewport");
@@ -434,8 +427,45 @@ static void stepGame() {
         circlePosition = glm::vec3(x, y, 0);
     }
 
-    // update objects
+    // update the position of touchPointer
+    touchPointer.translation = glm::vec3(curPosition.x, curPosition.y, 0.0f);
+
+    // update the rotation of the cool object
+    originPoint.rotation = glm::rotate(originPoint.rotation, glm::radians(1.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    originPoint.rotation = glm::normalize(originPoint.rotation);
+
+    touchPointer.Update();
     originPoint.Update();
+
+    std::set<Object*> collidedObjects;
+    std::set<Object*> nonCollidedObjects;
+
+    // check collision
+    for (auto& it : gameObjects) {
+        // find a list of objects which have collided
+        for (auto& other : gameObjects) {
+            // skip if me == other
+            if (it == other) {
+                continue;
+            }
+
+            if (it->checkCollision(*other)) {
+                // load a list of collided objects
+                collidedObjects.emplace(it);
+                collidedObjects.emplace(other);
+            }
+        }
+    }
+
+    // set collided objects to a yellow color
+    for (auto& it : collidedObjects) {
+        it->color = glm::vec4(1.0f, 1.0f, 0.0f, 1.0f);
+    }
+
+    std::set_difference(gameObjects.begin(), gameObjects.end(), collidedObjects.begin(), collidedObjects.end(), std::inserter(nonCollidedObjects, nonCollidedObjects.end()));
+    for (auto& it : nonCollidedObjects) {
+        it->color = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f);
+    }
 }
 
 static void updateTime() {
@@ -569,6 +599,7 @@ static void drawTouchDot() {
     modelMat = glm::mat4(1.0f);
     mat = orthoMat * modelMat;
     glUniformMatrix4fv(mvpMatrixLoc, 1, GL_FALSE, glm::value_ptr(mat));
+    glUniform4fv(colorVecLoc, 1, glm::value_ptr(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)));
 
     // draw rectangle loop at (0, 0)
     glBindVertexArray(rectangleVAO);
@@ -578,21 +609,18 @@ static void drawTouchDot() {
     modelMat = glm::translate(glm::mat4(1), circlePosition);
     mat = orthoMat * modelMat;
     glUniformMatrix4fv(mvpMatrixLoc, 1, GL_FALSE, glm::value_ptr(mat));
+    glUniform4fv(colorVecLoc, 1, glm::value_ptr(glm::vec4(0.0f, 0.0f, 1.0f, 1.0f)));
+
+    // draw random circle
     circle.Draw();
 
     // translate the triangle to move it
-    modelMat = glm::translate(glm::mat4(1), glm::vec3(curPosition.x, curPosition.y, 0));
-    mat = orthoMat * modelMat;
-    glUniformMatrix4fv(mvpMatrixLoc, 1, GL_FALSE, glm::value_ptr(mat));
-
-    // draw triangle at current finger position offset from (0, 0)
-    glBindVertexArray(triangleVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
-
-    // draw objects with a scene graph (origin point at 10.0f on y axis)
     modelMat = glm::mat4(1.0f);
     mat = orthoMat * modelMat;
-    originPoint.Draw(mat, mvpMatrixLoc);
+
+    // draw objects with a scene graph (origin point at 10.0f on y axis)
+    touchPointer.Draw(mat, mvpMatrixLoc, colorVecLoc);
+    originPoint.Draw(mat, mvpMatrixLoc, colorVecLoc);
 
 
     glBindVertexArray(0);
@@ -622,8 +650,6 @@ static void shutdown() {
 
     // @TODO kill program shaders etc
     glDeleteBuffers(1, &rectangleBuffer);
-    glDeleteBuffers(1, &triangleBuffer);
-    glDeleteVertexArrays(1, &triangleVAO);
     glDeleteVertexArrays(1, &rectangleVAO);
 }
 

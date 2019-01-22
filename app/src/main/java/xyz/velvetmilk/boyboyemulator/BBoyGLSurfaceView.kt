@@ -101,7 +101,7 @@ class BBoyGLSurfaceView: GLSurfaceView {
             y = roundedY
         }
 
-        Log.d(TAG, "x: " + event.x * event.xPrecision + " | y: " + event.y * event.xPrecision)
+        //Log.d(TAG, "x: " + event.x * event.xPrecision + " | y: " + event.y * event.xPrecision)
 
         BBoyJNILib.sendEvent(BBoyInputEvent(x, y))
 

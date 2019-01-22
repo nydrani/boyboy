@@ -25,6 +25,9 @@ Object::Object(glm::vec3 translation, glm::quat rotation, glm::vec3 scale)
     indices.emplace_back(0, 2, 1);
     indices.emplace_back(0, 3, 2);
 
+    // set color to black
+    color = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+
     // setup opengl
     // generate buffers
     glGenBuffers(1, &objIndexBuffer);
@@ -64,7 +67,7 @@ void Object::addChild(std::unique_ptr<Object> child) {
     this->child = std::move(child);
 }
 
-glm::mat4 Object::TRS(glm::mat4 curWorldModel) {
+glm::mat4 Object::TRS(glm::mat4 curWorldModel) const {
     glm::mat4 orig = curWorldModel;
 
     float angle = glm::angle(this->rotation);
@@ -82,22 +85,24 @@ glm::mat4 Object::TRS(glm::mat4 curWorldModel) {
 
 void Object::Update() {
     // update the rotation here
-    // @TODO may need to normalise the rotation here (maths in glm is dodge)
-    this->rotation = glm::rotate(this->rotation, glm::radians(1.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    this->rotation = glm::normalize(this->rotation);
 
-    LOGD("%s", glm::to_string(glm::axis(this->rotation)).c_str());
-    LOGD("%f", glm::angle(this->rotation));
+    // @TODO may need to normalise the rotation here (maths in glm is dodge)
+    //this->rotation = glm::rotate(this->rotation, glm::radians(1.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    //this->rotation = glm::normalize(this->rotation);
+
+    // LOGD("%s", glm::to_string(glm::axis(this->rotation)).c_str());
+    // LOGD("%f", glm::angle(this->rotation));
 
     if (child != nullptr) {
         child->Update();
     }
 }
 
-void Object::Draw(glm::mat4 worldMat, GLint mvpMatrixLoc) {
+void Object::Draw(glm::mat4 worldMat, GLint mvpMatrixLoc, GLint colorVecLoc) {
     // rotate stuff around
     glm::mat4 localMat = TRS(worldMat);
     glUniformMatrix4fv(mvpMatrixLoc, 1, GL_FALSE, glm::value_ptr(localMat));
+    glUniform4fv(colorVecLoc, 1, glm::value_ptr(color));
 
     // draw a square of 2x2 unit size at the current spot
     glBindVertexArray(objVAO);
@@ -106,6 +111,69 @@ void Object::Draw(glm::mat4 worldMat, GLint mvpMatrixLoc) {
 
     // draw children
     if (child != nullptr) {
-        child->Draw(localMat, mvpMatrixLoc);
+        child->Draw(localMat, mvpMatrixLoc, colorVecLoc);
     }
+}
+
+glm::mat4 Object::getWorldTRS() const {
+    glm::mat4 worldTRS = TRS(glm::mat4(1.0f));
+
+    if (this->parent != nullptr) {
+        worldTRS = this->parent->getWorldTRS() * worldTRS;
+    }
+
+    return worldTRS;
+}
+
+AABB Object::getAABB() const {
+    // generate bounding box
+    float minX = std::numeric_limits<float>::max();
+    float minY = std::numeric_limits<float>::max();
+    float minZ = std::numeric_limits<float>::max();
+    float maxX = std::numeric_limits<float>::min();
+    float maxY = std::numeric_limits<float>::min();
+    float maxZ = std::numeric_limits<float>::min();
+
+    glm::mat4 worldMat = getWorldTRS();
+
+    for (auto& vertex : vertices) {
+        // generate min bounding box
+        glm::vec4 transformedVec = worldMat * glm::vec4(vertex.x, vertex.y, vertex.z, 1.0f);
+        if (transformedVec.x < minX) {
+            minX = transformedVec.x;
+        }
+        if (transformedVec.y < minY) {
+            minY = transformedVec.y;
+        }
+        if (transformedVec.z < minZ) {
+            minZ = transformedVec.z;
+        }
+
+        // generate max bounding box
+        if (transformedVec.x > maxX) {
+            maxX = transformedVec.x;
+        }
+        if (transformedVec.y > maxY) {
+            maxY = transformedVec.y;
+        }
+        if (transformedVec.z > maxZ) {
+            maxZ = transformedVec.z;
+        }
+    }
+    return AABB(glm::vec4(minX, minY, minZ, 1.0f), glm::vec4(maxX, maxY, maxZ, 1.0f));
+}
+
+bool Object::checkCollision(const Object& other) const {
+    if (this == &other) {
+        return false;
+    }
+
+    AABB worldAABB = getAABB();
+    bool collided = worldAABB.overlaps(other.getAABB());
+
+    if (collided) {
+        //LOGD("collided with something else: %p", &other);
+    }
+
+    return collided;
 }

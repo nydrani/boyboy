@@ -9,16 +9,17 @@
 #include <GLES3/gl32.h>
 
 #include "core/bboycore.hpp"
+#include "AABB.hpp"
 
 class Object {
 public:
     Object(glm::vec3, glm::quat, glm::vec3);
-    Object() : Object(glm::vec3(1.0f, 1.0f, 1.0f), glm::identity<glm::quat>(), glm::vec3(2.0f, 2.0f, 2.0f)) {
+    Object() : Object(glm::vec3(1.0f, 1.0f, 1.0f), glm::identity<glm::quat>(), glm::vec3(1.0f, 1.0f, 1.0f)) {
         LOGD("Being default constructed");
     }
 
     // move constructor
-    Object(Object&& other) noexcept : translation(other.translation), rotation(other.rotation), scale(other.scale) {
+    Object(Object&& other) noexcept : translation(other.translation), rotation(other.rotation), scale(other.scale), color(other.color) {
         LOGD("Being moved constructed");
 
         child = std::move(other.child);
@@ -49,6 +50,7 @@ public:
         translation = other.translation;
         rotation = other.rotation;
         scale = other.scale;
+        color = other.color;
 
         child = std::move(other.child);
         parent = other.parent;
@@ -64,13 +66,18 @@ public:
     ~Object();
 
     void addChild(std::unique_ptr<Object>);
-    glm::mat4 TRS(glm::mat4);
+    glm::mat4 TRS(glm::mat4) const;
     void Update();
-    void Draw(glm::mat4, GLint);
+    void Draw(glm::mat4, GLint, GLint);
+    bool checkCollision(const Object&) const;
+    glm::mat4 getWorldTRS() const;
+    AABB getAABB() const;
 
     glm::vec3 translation;
     glm::quat rotation;
     glm::vec3 scale;
+    glm::vec4 color;
+
 private:
     std::unique_ptr<Object> child;
     Object* parent = nullptr;
