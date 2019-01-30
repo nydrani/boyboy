@@ -41,6 +41,12 @@ class BBoyJNILib {
         external fun resume()
 
         @JvmStatic
+        external fun pauseEngine()
+
+        @JvmStatic
+        external fun resumeEngine()
+
+        @JvmStatic
         external fun shutdown()
 
         @JvmStatic

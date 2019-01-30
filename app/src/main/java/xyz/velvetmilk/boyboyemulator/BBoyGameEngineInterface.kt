@@ -52,7 +52,6 @@ class BBoyGameEngineInterface {
 
     fun initGameLoop() {
         BBoyJNILib.init()
-
     }
     
     fun runGameLoop() {
@@ -68,6 +67,14 @@ class BBoyGameEngineInterface {
 
     fun resumeGameLoop() {
         BBoyJNILib.resume()
+    }
+
+    fun pauseGameEngine() {
+        BBoyJNILib.pauseEngine()
+    }
+
+    fun resumeGameEngine() {
+        BBoyJNILib.resumeEngine()
     }
 
     fun finishGameLoop() {

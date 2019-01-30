@@ -16,6 +16,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <set>
+#include <sstream>
 
 #include "tools/tools.hpp"
 
@@ -32,12 +33,14 @@ static bool initOpenGLObjects();
 static void runGameLoop();
 static bool setupScreen(int, int);
 static void processInput();
-static void renderFrame(double);
+static void renderFrame();
 static void updateTime();
 static void updateGame();
 static void stepGame();
 static void pauseGame();
 static void resumeGame();
+static void pauseGameEngine();
+static void resumeGameEngine();
 static void shutdown();
 static void storeEvent(struct EventItem);
 static void drawTouchDot();
@@ -187,13 +190,16 @@ static float bgColor;
 
 static struct timespec prevTimeUPS;
 static struct timespec prevTimeFPS;
+static struct timespec timeDiff;
 static bool paused;
+static bool enginePaused;
 static float colorUpdate;
 
-static double fps;
-static double ups;
-static double true_ups;
-static double lag;
+static float fps;
+static float ups;
+static float true_ups;
+static float lag;
+static float interpolation;
 
 static int screenWidth;
 static int screenHeight;
@@ -206,15 +212,19 @@ static float dotRotation;
 static struct EventItem curPosition;
 static struct EventItem rawPosition;
 
+static std::mutex pauseMutex;
+
 static std::queue<struct EventItem> inputBuffer;
 static std::queue<struct EventItem> rawInputBuffer;
 
 static std::thread gameLoop;
 static bool running;
+static bool openGLReady;
 
 static std::set<Object*> gameObjects;
 
 static uint64_t currentFrame;
+static uint64_t currentSteppedFrame;
 
 static GLuint rectangleBuffer;
 static GLuint rectangleVAO;
@@ -235,25 +245,21 @@ struct EventItem convertScreenCoordToWorldCoord(struct EventItem &position) {
     // need to -1 in width and height for 0th offset
     float xPos = worldWidth * position.x / (screenWidth - 1) - (worldWidth / 2);
     float yPos = worldHeight * position.y / (screenHeight - 1) - (worldHeight / 2);
-    // old incorrect maths with off by 1 error
-    //float xPos = (position.x / screenRatioX) - (worldWidth / 2.0f);
-    //float yPos = (position.y / screenRatioY) - (worldHeight / 2.0f);
 
     // negative y ratio since screen is top to bottom while coordinates is bottom to top
     return { xPos, -yPos };
 }
 
 struct EventItem convertWorldCoordToScreenCoord(struct EventItem &position) {
+    // need to -1 in width and height for 0th offset
     float xPos = (screenWidth - 1) * (position.x + worldWidth / 2) / worldWidth;
     float yPos = (screenHeight - 1) * (position.y + worldHeight / 2) / worldHeight;
-    //float xPos = (position.x + (worldWidth / 2.0f)) * screenRatioX;
-    //float yPos = (-position.y + (worldHeight / 2.0f)) * screenRatioY;
 
     // negative y ratio since screen is top to bottom while coordinates is bottom to top
     return { xPos, -yPos };
 }
 
-static double getElapsedTime(struct timespec &prevTime, struct timespec &curTime) {
+static float getElapsedTime(struct timespec &prevTime, struct timespec &curTime) {
     // calculate elapsed time between prev and cur
     __kernel_long_t elapsedSec = curTime.tv_sec - prevTime.tv_sec;
     long elapsedNSec = curTime.tv_nsec - prevTime.tv_nsec;
@@ -264,8 +270,8 @@ static double getElapsedTime(struct timespec &prevTime, struct timespec &curTime
         elapsedNSec = curTime.tv_nsec - prevTime.tv_nsec + BILLION;
     }
 
-    // convert to double
-    double elapsed = elapsedSec + elapsedNSec / BILLION_DOUBLE;
+    // convert to float
+    float elapsed = elapsedSec + elapsedNSec / BILLION_FLOAT;
 
     return elapsed;
 }
@@ -283,21 +289,25 @@ static void initProgram() {
     prevTimeUPS = res;
 
     colorUpdate = 0.02f;
-    fps = 0.0;
-    ups = 0.0;
-    true_ups = 0.0;
-    lag = 0.0;
+    fps = 0.0f;
+    ups = 0.0f;
+    true_ups = 0.0f;
+    lag = 0.0f;
+    interpolation = 0.0f;
     dotRotation = 0.0f;
 
     currentFrame = 0;
+    currentSteppedFrame = 0;
 
     curPosition = { 0.0f, 0.0f };
     rawPosition = { 0.0f, 0.0f };
 
     rng.seed(std::random_device()());
 
-    running = true;
+    running = false;
+    openGLReady = false;
     paused = false;
+    enginePaused = false;
 }
 
 static bool initOpenGL() {
@@ -343,12 +353,13 @@ static bool initOpenGL() {
     glUseProgram(program);
     checkGLError("glUseProgram");
 
+    // get uniform variable location in GPU
     mvpMatrixLoc = glGetUniformLocation(program, "uMVPMatrix");
     colorVecLoc = glGetUniformLocation(program, "color");
-    LOGD("location of mvp matrix: %d", mvpMatrixLoc);
-    LOGD("location of color vec4: %d", colorVecLoc);
     glUniformMatrix4fv(mvpMatrixLoc, 1, GL_FALSE, glm::value_ptr(glm::mat4(1)));
     glUniform4fv(colorVecLoc, 1, glm::value_ptr(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)));
+
+    openGLReady = true;
 
     return true;
 }
@@ -368,9 +379,6 @@ static bool initOpenGLObjects() {
     originPoint.translation = glm::vec3(0, 10, 0);
     childObj->translation = glm::vec3(10, 0, 0);
     originPoint.addChild(std::move(childObj));
-
-    glBindVertexArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     return true;
 }
@@ -396,7 +404,7 @@ static bool setupScreen(int w, int h) {
 }
 
 static void stepGame() {
-    currentFrame++;
+    currentSteppedFrame++;
 
     yeeNum++;
     yeeNum %= 60;
@@ -481,7 +489,7 @@ static void updateGame() {
     // calculate time elapsed from previous update
     struct timespec res;
     clock_gettime(CLOCK_MONOTONIC, &res);
-    double elapsed = getElapsedTime(prevTimeUPS, res);
+    float elapsed = getElapsedTime(prevTimeUPS, res);
     lag += elapsed;
 
     // num updates per second
@@ -489,16 +497,22 @@ static void updateGame() {
 
     // update in steps
     while (lag >= MS_PER_UPDATE && updateCounter < MAX_FRAME_SKIP) {
-        stepGame();
+        if (!paused) {
+            stepGame();
+        }
         lag -= MS_PER_UPDATE;
 
+        currentFrame++;
         updateCounter++;
     }
 
-    if (updateCounter > 0) {
-        ups = MOVING_AVERAGE_ALPHA * ups + (1.0 - MOVING_AVERAGE_ALPHA) * updateCounter / elapsed;
+    if (!paused) {
+        interpolation = lag / MS_PER_UPDATE;
+    }
 
-        true_ups = MOVING_AVERAGE_ALPHA * true_ups + (1.0 - MOVING_AVERAGE_ALPHA) / elapsed;
+    if (updateCounter > 0) {
+        ups = MOVING_AVERAGE_ALPHA * ups + (1.0f - MOVING_AVERAGE_ALPHA) * updateCounter / elapsed;
+        true_ups = MOVING_AVERAGE_ALPHA * true_ups + (1.0f - MOVING_AVERAGE_ALPHA) / elapsed;
     }
 }
 
@@ -508,6 +522,37 @@ static void pauseGame() {
 
 static void resumeGame() {
     paused = false;
+}
+
+static void pauseGameEngine() {
+    // dont attempt to grab mutex again (from android UI thread)
+    if (enginePaused) {
+        return;
+    }
+
+    // set flag before attempting to lock
+    enginePaused = true;
+    pauseMutex.lock();
+
+    struct timespec res;
+    clock_gettime(CLOCK_MONOTONIC, &res);
+
+    // store time difference
+    timeDiff.tv_sec = res.tv_sec - prevTimeUPS.tv_sec;
+    timeDiff.tv_nsec = res.tv_nsec - prevTimeUPS.tv_nsec;
+}
+
+static void resumeGameEngine() {
+    // set flag only after unlock attempt
+    pauseMutex.unlock();
+    enginePaused = false;
+
+    // restore time difference
+    struct timespec res;
+    clock_gettime(CLOCK_MONOTONIC, &res);
+
+    prevTimeUPS.tv_sec = res.tv_sec - timeDiff.tv_sec;
+    prevTimeUPS.tv_nsec = res.tv_nsec - timeDiff.tv_nsec;
 }
 
 static void storeEvent(struct EventItem event) {
@@ -551,21 +596,21 @@ static void processRawInput() {
     rawPosition.y = s.y;
 }
 
-static void renderFrame(double interpolation) {
+static void renderFrame() {
     // update fps average counter
     // obtain time elapsed for fps
     struct timespec res;
     clock_gettime(CLOCK_MONOTONIC, &res);
-    double elapsed = getElapsedTime(prevTimeFPS, res);
+    float elapsed = getElapsedTime(prevTimeFPS, res);
 
     // store current times
     prevTimeFPS = res;
 
     // calculate fps here
-    fps = MOVING_AVERAGE_ALPHA * fps + (1.0 - MOVING_AVERAGE_ALPHA) / elapsed;
+    fps = MOVING_AVERAGE_ALPHA * fps + (1.0f - MOVING_AVERAGE_ALPHA) / elapsed;
 
     // interpolate bgColor
-    GLfloat interpBgColor = bgColor + colorUpdate * (float)interpolation;
+    GLfloat interpBgColor = bgColor + colorUpdate * interpolation;
 
     glClearColor(interpBgColor, interpBgColor, interpBgColor, 1.0f);
     checkGLError("glClearColor");
@@ -577,6 +622,7 @@ static void renderFrame(double interpolation) {
     drawTouchDot();
 }
 
+// @TODO convert to renderer with interpolation
 static void drawTouchDot() {
     // place ortho camera to bottom left as 0,0
     // glm::mat4 orthoMat = glm::ortho(0.0f, (float)width, 0.0f, (float)height);
@@ -606,7 +652,7 @@ static void drawTouchDot() {
     glDrawArrays(GL_LINE_LOOP, 0, 4);
 
     // draw circle at random point between (-50, 50)
-    modelMat = glm::translate(glm::mat4(1), circlePosition);
+    modelMat = glm::translate(glm::mat4(1.0f), circlePosition);
     mat = orthoMat * modelMat;
     glUniformMatrix4fv(mvpMatrixLoc, 1, GL_FALSE, glm::value_ptr(mat));
     glUniform4fv(colorVecLoc, 1, glm::value_ptr(glm::vec4(0.0f, 0.0f, 1.0f, 1.0f)));
@@ -620,27 +666,35 @@ static void drawTouchDot() {
 
     // draw objects with a scene graph (origin point at 10.0f on y axis)
     touchPointer.Draw(mat, mvpMatrixLoc, colorVecLoc);
-    originPoint.Draw(mat, mvpMatrixLoc, colorVecLoc);
+    touchPointer.DrawAABB(mat, mvpMatrixLoc, colorVecLoc);
 
+    originPoint.Draw(mat, mvpMatrixLoc, colorVecLoc);
+    originPoint.DrawAABB(mat, mvpMatrixLoc, colorVecLoc);
 
     glBindVertexArray(0);
 }
 
 static void runGameLoop() {
     while (running) {
+        if (!openGLReady) {
+            continue;
+        }
+        // call mutex conditions to pause thread when game is closed
+        std::lock_guard<std::mutex> lock(pauseMutex);
+
+
         // @TODO check if there is an issue here when game runs slower than render
         processInput();
         processRawInput();
 
-        if (!paused) {
-            updateGame();
-        }
+        updateGame();
 
         // rendering is externally called
         updateTime();
 
         // print any errors which may have occurred
         printGLErrors();
+
     }
 }
 
@@ -684,6 +738,12 @@ JNIEXPORT jboolean JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_initOpe
                                                                                     jclass obj) {
     LOGV(__FUNCTION__, "initOpenGL");
 
+    auto id = std::this_thread::get_id();
+    std::stringstream ss;
+    ss << id;
+    std::string id_string = ss.str();
+    LOGI("%s opengl init thread", id_string.c_str());
+
     bool success = initOpenGL();
     initOpenGLObjects();
 
@@ -705,7 +765,14 @@ JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_render(JNIE
     LOGV(__FUNCTION__, "render");
 
     // interpolate the frame rendered between current and next [0-1]
-    renderFrame(lag / MS_PER_UPDATE);
+    renderFrame();
+}
+
+JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_resume(JNIEnv *env,
+                                                                           jclass obj) {
+    LOGV(__FUNCTION__, "resume");
+
+    resumeGame();
 }
 
 JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_pause(JNIEnv *env,
@@ -715,11 +782,18 @@ JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_pause(JNIEn
     pauseGame();
 }
 
-JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_resume(JNIEnv *env,
-                                                                            jclass obj) {
-    LOGV(__FUNCTION__, "resume");
+JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_pauseEngine(JNIEnv *env,
+                                                                           jclass obj) {
+    LOGV(__FUNCTION__, "pauseGameEngine");
 
-    resumeGame();
+    pauseGameEngine();
+}
+
+JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_resumeEngine(JNIEnv *env,
+                                                                            jclass obj) {
+    LOGV(__FUNCTION__, "resumeGameEngine");
+
+    resumeGameEngine();
 }
 
 JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_shutdown(JNIEnv *env,
@@ -737,17 +811,18 @@ JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_obtainFPS(J
     jclass clazz = env->GetObjectClass(obj);
 
     // Get Field references
-    jfieldID param1Field = env->GetFieldID(clazz, "fps", "D");
-    jfieldID param2Field = env->GetFieldID(clazz, "ups", "D");
-    jfieldID param3Field = env->GetFieldID(clazz, "true_ups", "D");
+    jfieldID param1Field = env->GetFieldID(clazz, "fps", "F");
+    jfieldID param2Field = env->GetFieldID(clazz, "ups", "F");
+    jfieldID param3Field = env->GetFieldID(clazz, "true_ups", "F");
     jfieldID param4Field = env->GetFieldID(clazz, "frame", "J");
-
+    jfieldID param5Field = env->GetFieldID(clazz, "stepped_frame", "J");
 
     // Set fields for object
-    env->SetDoubleField(obj, param1Field, fps);
-    env->SetDoubleField(obj, param2Field, ups);
-    env->SetDoubleField(obj, param3Field, true_ups);
+    env->SetFloatField(obj, param1Field, fps);
+    env->SetFloatField(obj, param2Field, ups);
+    env->SetFloatField(obj, param3Field, true_ups);
     env->SetLongField(obj, param4Field, currentFrame);
+    env->SetLongField(obj, param5Field, currentSteppedFrame);
 }
 
 JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_obtainPos(JNIEnv *env,
@@ -762,7 +837,6 @@ JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_obtainPos(J
     jfieldID param2Field = env->GetFieldID(clazz, "y", "F");
     jfieldID param3Field = env->GetFieldID(clazz, "normX", "F");
     jfieldID param4Field = env->GetFieldID(clazz, "normY", "F");
-
 
     // Set fields for object
     env->SetFloatField(obj, param1Field, rawPosition.x);

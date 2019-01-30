@@ -68,7 +68,9 @@ public:
     void addChild(std::unique_ptr<Object>);
     glm::mat4 TRS(glm::mat4) const;
     void Update();
-    void Draw(glm::mat4, GLint, GLint);
+    void Draw(glm::mat4, GLint, GLint) const;
+    void DrawAABB(glm::mat4, GLint, GLint) const;
+    void updateAABBVertices();
     bool checkCollision(const Object&) const;
     glm::mat4 getWorldTRS() const;
     AABB getAABB() const;
@@ -82,7 +84,9 @@ private:
     std::unique_ptr<Object> child;
     Object* parent = nullptr;
     std::vector<glm::vec3> vertices;
+    std::vector<glm::vec3> bBoxVertices;
     std::vector<glm::uvec3> indices;
+    std::vector<uint32_t> bBoxIndices;
     GLuint objIndexBuffer, objVertexBuffer, objVAO;
 };
 

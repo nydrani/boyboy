@@ -25,6 +25,7 @@ class MainActivity : Activity() {
     private lateinit var upsView: TextView
     private lateinit var trueupsView: TextView
     private lateinit var curFrameView: TextView
+    private lateinit var curSteppedFrameView: TextView
     private lateinit var posView: TextView
     private lateinit var normPosView: TextView
 
@@ -60,6 +61,7 @@ class MainActivity : Activity() {
         upsView = ups_text
         trueupsView = true_ups_text
         curFrameView = cur_frame_text
+        curSteppedFrameView = cur_stepped_frame_text
         posView = pos_text
         normPosView = norm_pos_text
 
@@ -77,6 +79,8 @@ class MainActivity : Activity() {
 
         pause_button.setOnClickListener { gameEngine.pauseGameLoop() }
         resume_button.setOnClickListener { gameEngine.resumeGameLoop() }
+        pause_engine_button.setOnClickListener { gameEngine.pauseGameEngine() }
+        resume_engine_button.setOnClickListener { gameEngine.resumeGameEngine() }
     }
 
     override fun onStart() {
@@ -94,6 +98,8 @@ class MainActivity : Activity() {
                 handler.sendEmptyMessage(POS_UPDATE)
             }
         })
+
+        gameEngine.resumeGameEngine()
     }
 
     override fun onStop() {
@@ -103,6 +109,8 @@ class MainActivity : Activity() {
         surfaceView.onPause()
         gameEngine.shutdownFPSRunner()
         gameEngine.shutdownPosRunner()
+
+        gameEngine.pauseGameEngine()
     }
 
     override fun onDestroy() {
@@ -157,6 +165,7 @@ class MainActivity : Activity() {
         upsView.text = "UPS: " + fpsInfo.ups.toString()
         trueupsView.text = "TRUE_UPS: " + fpsInfo.true_ups.toString()
         curFrameView.text = "Frame #: " + fpsInfo.frame.toString()
+        curSteppedFrameView.text = "Stepped Frame #: " + fpsInfo.stepped_frame.toString()
     }
 
     private fun updatePosText(posInfo: BBoyInputEvent) {

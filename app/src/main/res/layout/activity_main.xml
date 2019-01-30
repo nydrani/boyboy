@@ -34,13 +34,22 @@
         app:layout_constraintEnd_toEndOf="parent"/>
 
     <TextView
-        android:id="@+id/cur_frame_text"
+        android:id="@+id/cur_stepped_frame_text"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:textColor="@color/colorAccent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toStartOf="@+id/debug_info_split"
         app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/cur_frame_text"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:textColor="@color/colorAccent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/debug_info_split"
+        app:layout_constraintTop_toBottomOf="@+id/cur_stepped_frame_text" />
 
     <TextView
         android:id="@+id/fps_text"
@@ -90,16 +99,34 @@
 
     <Button
         android:id="@+id/pause_button"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Pause"
-        app:layout_constraintTop_toBottomOf="@+id/norm_pos_text" />
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/opengl_version_text" />
 
     <Button
         android:id="@+id/resume_button"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Resume"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/pause_button" />
+
+    <Button
+        android:id="@+id/pause_engine_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Pause engine"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/resume_button" />
+
+    <Button
+        android:id="@+id/resume_engine_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Resume engine"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/pause_engine_button" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -26,11 +26,11 @@
 
 
 #define TIME_STEP 60
-#define MS_PER_UPDATE (1.0 / TIME_STEP)
+#define MS_PER_UPDATE (1.0f / TIME_STEP)
 #define MAX_FRAME_SKIP 10
-#define MOVING_AVERAGE_ALPHA 0.9
+#define MOVING_AVERAGE_ALPHA 0.9f
 #define BILLION 1000000000
-#define BILLION_DOUBLE 1000000000.0
+#define BILLION_FLOAT 1000000000.0f
 #define M_PI_FLOAT 3.14159265358979323846f
 #define WORLD_SIZE 100
 
@@ -61,6 +61,8 @@ extern "C" {
     JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_render(JNIEnv *, jclass);
     JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_resume(JNIEnv *, jclass);
     JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_pause(JNIEnv *, jclass);
+    JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_resumeEngine(JNIEnv *, jclass);
+    JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_pauseEngine(JNIEnv *, jclass);
     JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_shutdown(JNIEnv *, jclass);
     JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_obtainFPS(JNIEnv *, jclass, jobject);
     JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_obtainPos(JNIEnv *, jclass, jobject);

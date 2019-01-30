@@ -7,6 +7,8 @@
 #include <glm/glm.hpp>
 #include <glm/detail/type_quat.hpp>
 #include <glm/ext.hpp>
+#include <thread>
+#include <sstream>
 #include "core/bboycore.hpp"
 #include "Object.hpp"
 
@@ -25,6 +27,11 @@ Object::Object(glm::vec3 translation, glm::quat rotation, glm::vec3 scale)
     indices.emplace_back(0, 2, 1);
     indices.emplace_back(0, 3, 2);
 
+    bBoxIndices.emplace_back(4);
+    bBoxIndices.emplace_back(5);
+    bBoxIndices.emplace_back(6);
+    bBoxIndices.emplace_back(7);
+
     // set color to black
     color = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
 
@@ -39,11 +46,16 @@ Object::Object(glm::vec3 translation, glm::quat rotation, glm::vec3 scale)
 
     // bind vertices
     glBindBuffer(GL_ARRAY_BUFFER, objVertexBuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(*vertices.begin()) * vertices.size(), vertices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, 2 * sizeof(*vertices.begin()) * vertices.size(), 0, GL_DYNAMIC_DRAW);
 
     // bind indices
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, objIndexBuffer);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(*indices.begin()) * indices.size(), indices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(*indices.begin()) * indices.size() + sizeof(*bBoxIndices.begin()) * bBoxIndices.size(), 0, GL_DYNAMIC_DRAW);
+
+    // bind binding box vertices
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(*vertices.begin()) * vertices.size(), vertices.data());
+    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, sizeof(*indices.begin()) * indices.size(), indices.data());
+    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, sizeof(*indices.begin()) * indices.size(), sizeof(*bBoxIndices.begin()) * bBoxIndices.size(), bBoxIndices.data());
 
     // @TODO (find out what this does)
     // no idea what this does (seems to enable the attribute (vPosition)in the shader) [to allow binding into it]
@@ -84,8 +96,10 @@ glm::mat4 Object::TRS(glm::mat4 curWorldModel) const {
 }
 
 void Object::Update() {
-    // update the rotation here
+    // update aabb vertices
+    updateAABBVertices();
 
+    // update the rotation here
     // @TODO may need to normalise the rotation here (maths in glm is dodge)
     //this->rotation = glm::rotate(this->rotation, glm::radians(1.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     //this->rotation = glm::normalize(this->rotation);
@@ -98,7 +112,7 @@ void Object::Update() {
     }
 }
 
-void Object::Draw(glm::mat4 worldMat, GLint mvpMatrixLoc, GLint colorVecLoc) {
+void Object::Draw(glm::mat4 worldMat, GLint mvpMatrixLoc, GLint colorVecLoc) const {
     // rotate stuff around
     glm::mat4 localMat = TRS(worldMat);
     glUniformMatrix4fv(mvpMatrixLoc, 1, GL_FALSE, glm::value_ptr(localMat));
@@ -112,6 +126,28 @@ void Object::Draw(glm::mat4 worldMat, GLint mvpMatrixLoc, GLint colorVecLoc) {
     // draw children
     if (child != nullptr) {
         child->Draw(localMat, mvpMatrixLoc, colorVecLoc);
+    }
+}
+
+void Object::DrawAABB(glm::mat4 worldMat, GLint mvpMatrixLoc, GLint colorVecLoc) const {
+    // draw in respect to world
+    glUniformMatrix4fv(mvpMatrixLoc, 1, GL_FALSE, glm::value_ptr(worldMat));
+
+    glBindVertexArray(objVAO);
+
+    // buffer data into the array buffer before drawing
+    glBindBuffer(GL_ARRAY_BUFFER, objVertexBuffer);
+    glBufferSubData(GL_ARRAY_BUFFER, sizeof(*vertices.begin()) * vertices.size(), sizeof(*bBoxVertices.begin()) * bBoxVertices.size(), bBoxVertices.data());
+
+    // draw bounding box
+    size_t offset = 6;
+    glUniform4fv(colorVecLoc, 1, glm::value_ptr(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)));
+    glDrawElements(GL_LINE_LOOP, 4, GL_UNSIGNED_INT, (void*)(offset * sizeof(GLuint)));
+
+    glBindVertexArray(0);
+
+    if (child != nullptr) {
+        child->DrawAABB(worldMat, mvpMatrixLoc, colorVecLoc);
     }
 }
 
@@ -130,9 +166,9 @@ AABB Object::getAABB() const {
     float minX = std::numeric_limits<float>::max();
     float minY = std::numeric_limits<float>::max();
     float minZ = std::numeric_limits<float>::max();
-    float maxX = std::numeric_limits<float>::min();
-    float maxY = std::numeric_limits<float>::min();
-    float maxZ = std::numeric_limits<float>::min();
+    float maxX = std::numeric_limits<float>::lowest();
+    float maxY = std::numeric_limits<float>::lowest();
+    float maxZ = std::numeric_limits<float>::lowest();
 
     glm::mat4 worldMat = getWorldTRS();
 
@@ -161,6 +197,23 @@ AABB Object::getAABB() const {
         }
     }
     return AABB(glm::vec4(minX, minY, minZ, 1.0f), glm::vec4(maxX, maxY, maxZ, 1.0f));
+}
+
+void Object::updateAABBVertices() {
+    // draw stuff here
+    AABB myAABB = getAABB();
+
+    // calculate box for AABB
+    glm::vec4 diffVec = myAABB.max - myAABB.min;
+    glm::vec3 topLeftPos = glm::vec3(myAABB.min.x, myAABB.min.y + diffVec.y, myAABB.min.z);
+    glm::vec3 bottomRightPos = glm::vec3(myAABB.min.x + diffVec.x, myAABB.min.y, myAABB.min.z);
+
+    // store vertices in vector
+    bBoxVertices.clear();
+    bBoxVertices.emplace_back(topLeftPos);
+    bBoxVertices.emplace_back(myAABB.max);
+    bBoxVertices.emplace_back(bottomRightPos);
+    bBoxVertices.emplace_back(myAABB.min);
 }
 
 bool Object::checkCollision(const Object& other) const {
