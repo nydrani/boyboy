@@ -117,9 +117,7 @@ class MainActivity : Activity() {
         super.onDestroy()
         Log.d(TAG, "onDestroy")
 
-        // any occasion where onDestroy does not get called is when the process will be nuked
-        // from existence so the thread leaking doesn't seem possible
-        gameEngine.finishGameLoop()
+        // on rotation (this gets called)
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

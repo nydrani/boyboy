@@ -5,8 +5,10 @@
 #ifndef BOYBOY_TOOLS_H
 #define BOYBOY_TOOLS_H
 
-float degToRads(float degrees);
+float degToRads(float);
 
-bool almostEquals(float a, float b);
+bool almostEquals(float, float);
+
+void printCurrentThread(const char*);
 
 #endif //BOYBOY_TOOLS_H

@@ -702,7 +702,9 @@ static void shutdown() {
     running = false;
     gameLoop.join();
 
-    // @TODO kill program shaders etc
+
+    // @TODO kill program shaders etc (may not be necessary since OS just cleans this up)
+    glDeleteProgram(program);
     glDeleteBuffers(1, &rectangleBuffer);
     glDeleteVertexArrays(1, &rectangleVAO);
 }
@@ -738,11 +740,7 @@ JNIEXPORT jboolean JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_initOpe
                                                                                     jclass obj) {
     LOGV(__FUNCTION__, "initOpenGL");
 
-    auto id = std::this_thread::get_id();
-    std::stringstream ss;
-    ss << id;
-    std::string id_string = ss.str();
-    LOGI("%s opengl init thread", id_string.c_str());
+    printCurrentThread("opengl init");
 
     bool success = initOpenGL();
     initOpenGLObjects();
@@ -782,18 +780,22 @@ JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_pause(JNIEn
     pauseGame();
 }
 
+JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_resumeEngine(JNIEnv *env,
+                                                                                  jclass obj) {
+    LOGV(__FUNCTION__, "resumeGameEngine");
+
+    printCurrentThread("resumeGameEngine");
+
+    resumeGameEngine();
+}
+
 JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_pauseEngine(JNIEnv *env,
                                                                            jclass obj) {
     LOGV(__FUNCTION__, "pauseGameEngine");
 
+    printCurrentThread("pauseGameEngine");
+
     pauseGameEngine();
-}
-
-JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_resumeEngine(JNIEnv *env,
-                                                                            jclass obj) {
-    LOGV(__FUNCTION__, "resumeGameEngine");
-
-    resumeGameEngine();
 }
 
 JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_shutdown(JNIEnv *env,
