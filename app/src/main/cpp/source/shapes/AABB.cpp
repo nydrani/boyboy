@@ -22,8 +22,8 @@ bool AABB::overlaps(const AABB& other) const {
         return false;
     }
 
-    LOGD("everything overlaps: a: %f %f, b: %f %f", min.x, max.x, other.min.x, other.max.x);
-    LOGD("everything overlaps: a: %f %f, b: %f %f", min.y, max.y, other.min.y, other.max.y);
-    LOGD("everything overlaps: a: %f %f, b: %f %f", min.z, max.z, other.min.z, other.max.z);
+//    LOGD("everything overlaps: a: %f %f, b: %f %f", min.x, max.x, other.min.x, other.max.x);
+//    LOGD("everything overlaps: a: %f %f, b: %f %f", min.y, max.y, other.min.y, other.max.y);
+//    LOGD("everything overlaps: a: %f %f, b: %f %f", min.z, max.z, other.min.z, other.max.z);
     return true;
 }

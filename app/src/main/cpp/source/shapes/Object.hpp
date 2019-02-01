@@ -22,6 +22,8 @@ public:
     Object(Object&& other) noexcept : translation(other.translation), rotation(other.rotation), scale(other.scale), color(other.color) {
         LOGD("Being moved constructed");
 
+        isActive = other.isActive;
+
         child = std::move(other.child);
         parent = other.parent;
 
@@ -46,11 +48,12 @@ public:
             return *this;
         }
 
-
         translation = other.translation;
         rotation = other.rotation;
         scale = other.scale;
         color = other.color;
+
+        isActive = other.isActive;
 
         child = std::move(other.child);
         parent = other.parent;
@@ -79,10 +82,11 @@ public:
     glm::quat rotation;
     glm::vec3 scale;
     glm::vec4 color;
+    bool isActive;
+    Object* parent = nullptr;
 
 private:
     std::unique_ptr<Object> child;
-    Object* parent = nullptr;
     std::vector<glm::vec3> vertices;
     std::vector<glm::vec3> bBoxVertices;
     std::vector<glm::uvec3> indices;

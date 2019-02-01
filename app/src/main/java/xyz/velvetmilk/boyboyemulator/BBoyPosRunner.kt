@@ -3,13 +3,16 @@ package xyz.velvetmilk.boyboyemulator
 /**
  * @author Victor Zhang
  */
-class BBoyPosRunner(private val inputInfo: BBoyInputEvent,
+class BBoyPosRunner(private val inputInfo: MutableList<BBoyInputEvent>,
                     private val posUpdateListener: OnPosUpdateListener): Runnable {
     @Volatile private var running: Boolean = true
 
     override fun run() {
         while (running) {
-            BBoyJNILib.obtainPos(inputInfo)
+            val posInfo: Array<BBoyInputEvent> = BBoyJNILib.obtainPos()
+
+            inputInfo.clear()
+            inputInfo.addAll(posInfo)
 
             posUpdateListener.onPosUpdate()
 

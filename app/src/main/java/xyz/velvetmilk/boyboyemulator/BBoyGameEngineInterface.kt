@@ -25,7 +25,7 @@ class BBoyGameEngineInterface {
         Thread(fpsRunner).start()
     }
 
-    fun initPosRunner(posInfo: BBoyInputEvent, posUpdateListener: BBoyPosRunner.OnPosUpdateListener) {
+    fun initPosRunner(posInfo: MutableList<BBoyInputEvent>, posUpdateListener: BBoyPosRunner.OnPosUpdateListener) {
         if (::posRunner.isInitialized) {
             posRunner.shutdown()
         }

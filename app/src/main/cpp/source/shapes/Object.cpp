@@ -14,7 +14,7 @@
 
 
 Object::Object(glm::vec3 translation, glm::quat rotation, glm::vec3 scale)
-                            : translation(translation), rotation(rotation), scale(scale) {
+                            : translation(translation), rotation(rotation), scale(scale), isActive(true) {
     LOGD("Being constructed");
 
     // generate vertices

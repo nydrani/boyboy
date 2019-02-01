@@ -53,13 +53,16 @@ class BBoyJNILib {
         external fun obtainFPS(fpsInfo: BBoyFPS)
 
         @JvmStatic
-        external fun obtainPos(posInfo: BBoyInputEvent)
+        external fun obtainPos(): Array<BBoyInputEvent>
 
         @JvmStatic
-        external fun sendEvent(event: BBoyInputEvent)
+        external fun obtainPosInplace(posInfoArray: Array<BBoyInputEvent>)
+
+        @JvmStatic
+        external fun sendEvent(event: Array<BBoyInputEvent>)
 
         fun printOpenGLInfo() {
-            val buffer = IntBuffer.allocate(1)
+//            val buffer = IntBuffer.allocate(1)
 
             val extensions = GLES10.glGetString(GLES10.GL_EXTENSIONS)
             val version = GLES10.glGetString(GLES10.GL_VERSION)

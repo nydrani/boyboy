@@ -59,6 +59,7 @@ class BBoyGLSurfaceView: GLSurfaceView {
 
     companion object {
         private val TAG = BBoyGLSurfaceView::class.java.simpleName
+        private const val MAX_TOUCH_POINTERS = 10
 
         private fun checkEglError(prompt: String) {
             var error: Int
@@ -81,31 +82,50 @@ class BBoyGLSurfaceView: GLSurfaceView {
     override fun onTouchEvent(event: MotionEvent): Boolean {
         super.onTouchEvent(event)
 
-        var x: Float = event.x * event.xPrecision
-        var y: Float = event.y * event.yPrecision
-
-        // if (x is almost an int) --> use int version
-        // @TODO fix epsilon to a better value than constant recalculation
-        // @TODO change to multiple of ulp if required???
-        // @TODO optmise if this is really slow
-        val roundedX = x.roundToInt().toFloat()
-        val roundedY = y.roundToInt().toFloat()
-
-        var epsilon = Math.ulp(roundedX)
-        if (roundedX != x && (roundedX - x).absoluteValue <= epsilon) {
-            x = roundedX
+        // NOTE: multi-touch
+        // problem is how to assign touchpointer id with which touch slot
+        // right now (since touchevents are discrete and shouldnt interact with each other)
+        // we can safely ignore which touch correlates to which pointer
+        val touchers = if (event.pointerCount > MAX_TOUCH_POINTERS) {
+            MAX_TOUCH_POINTERS
+        } else {
+            event.pointerCount
         }
 
-        epsilon = Math.ulp(roundedY)
-        if (roundedY != y && (roundedY - y).absoluteValue <= epsilon) {
-            y = roundedY
+        val xPrecision = event.xPrecision
+        val yPrecision = event.yPrecision
+
+        val touchList: MutableList<BBoyInputEvent> = mutableListOf()
+
+        for (i in 0 until touchers) {
+            var x: Float = event.getX(i) * xPrecision
+            var y: Float = event.getY(i) * yPrecision
+
+            // if (x is almost an int) --> use int version
+            // @TODO fix epsilon to a better value than constant recalculation
+            // @TODO change to multiple of ulp if required???
+            // @TODO optmise if this is really slow
+            val roundedX = x.roundToInt().toFloat()
+            val roundedY = y.roundToInt().toFloat()
+
+            var epsilon = Math.ulp(roundedX)
+            if (roundedX != x && (roundedX - x).absoluteValue <= epsilon) {
+                x = roundedX
+            }
+
+            epsilon = Math.ulp(roundedY)
+            if (roundedY != y && (roundedY - y).absoluteValue <= epsilon) {
+                y = roundedY
+            }
+
+            touchList.add(BBoyInputEvent(x, y))
         }
 
         //Log.d(TAG, "x: " + event.x * event.xPrecision + " | y: " + event.y * event.xPrecision)
+//        BBoyJNILib.sendEvent(BBoyInputEvent(x, y))
+        BBoyJNILib.sendEvent(touchList.toTypedArray())
 
-        BBoyJNILib.sendEvent(BBoyInputEvent(x, y))
-
-        when (event.action) {
+        when (event.action and MotionEvent.ACTION_MASK) {
             MotionEvent.ACTION_DOWN -> {
                 //Log.d(TAG, "x: " + event.x + " | y: " + event.y + " | motionevent: action_down")
                 performClick()

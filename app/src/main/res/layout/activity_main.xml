@@ -52,13 +52,22 @@
         app:layout_constraintTop_toBottomOf="@+id/cur_stepped_frame_text" />
 
     <TextView
+        android:id="@+id/cur_time_text"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:textColor="@color/colorAccent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/debug_info_split"
+        app:layout_constraintTop_toBottomOf="@+id/cur_frame_text" />
+
+    <TextView
         android:id="@+id/fps_text"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:textColor="@color/colorAccent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toStartOf="@+id/debug_info_split"
-        app:layout_constraintTop_toBottomOf="@+id/cur_frame_text" />
+        app:layout_constraintTop_toBottomOf="@+id/cur_time_text" />
 
     <TextView
         android:id="@+id/ups_text"

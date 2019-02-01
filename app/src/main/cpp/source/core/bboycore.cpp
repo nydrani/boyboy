@@ -42,7 +42,7 @@ static void resumeGame();
 static void pauseGameEngine();
 static void resumeGameEngine();
 static void shutdown();
-static void storeEvent(struct EventItem);
+static void storeEvent(std::vector<struct EventItem> const&);
 static void drawTouchDot();
 
 
@@ -209,19 +209,23 @@ static float worldHeight;
 
 static float dotRotation;
 
-static struct EventItem curPosition;
-static struct EventItem rawPosition;
+// NOTE: Probably remove current position list off to be NOT lingering
+static std::vector<struct EventItem> curPositionList;
+static std::vector<struct EventItem> rawPositionList;
 
 static std::mutex pauseMutex;
 
-static std::queue<struct EventItem> inputBuffer;
-static std::queue<struct EventItem> rawInputBuffer;
+static std::queue<std::vector<struct EventItem>> inputBuffer;
+static std::queue<std::vector<struct EventItem>> rawInputBuffer;
 
 static std::thread gameLoop;
 static bool running;
 static bool openGLReady;
 
 static std::set<Object*> gameObjects;
+
+static struct timespec startTime;
+static struct timespec curTime;
 
 static uint64_t currentFrame;
 static uint64_t currentSteppedFrame;
@@ -235,13 +239,24 @@ static std::mt19937 rng;
 
 static Circle circle;
 static Object originPoint;
-static Object touchPointer;
+static Object* pointerList[MAX_POINTER_SIZE];
 static glm::vec3 circlePosition;
 // =========================
 
 // normalization formula : x between [a, b]
 // https://stats.stackexchange.com/questions/178626/how-to-normalize-data-between-1-and-1
-struct EventItem convertScreenCoordToWorldCoord(struct EventItem &position) {
+void convertScreenCoordToWorldCoord(struct EventItem& position) {
+    // need to -1 in width and height for 0th offset
+    float xPos = worldWidth * position.x / (screenWidth - 1) - (worldWidth / 2);
+    float yPos = worldHeight * position.y / (screenHeight - 1) - (worldHeight / 2);
+
+    // negative y ratio since screen is top to bottom while coordinates is bottom to top
+    position.x = xPos;
+    position.y = -yPos;
+}
+
+
+struct EventItem convertScreenCoordToWorldCoord(struct EventItem const& position) {
     // need to -1 in width and height for 0th offset
     float xPos = worldWidth * position.x / (screenWidth - 1) - (worldWidth / 2);
     float yPos = worldHeight * position.y / (screenHeight - 1) - (worldHeight / 2);
@@ -250,7 +265,17 @@ struct EventItem convertScreenCoordToWorldCoord(struct EventItem &position) {
     return { xPos, -yPos };
 }
 
-struct EventItem convertWorldCoordToScreenCoord(struct EventItem &position) {
+void convertWorldCoordToScreenCoord(struct EventItem& position) {
+    // need to -1 in width and height for 0th offset
+    float xPos = (screenWidth - 1) * (position.x + worldWidth / 2) / worldWidth;
+    float yPos = (screenHeight - 1) * (position.y + worldHeight / 2) / worldHeight;
+
+    // negative y ratio since screen is top to bottom while coordinates is bottom to top
+    position.x = xPos;
+    position.y = -yPos;
+}
+
+struct EventItem convertWorldCoordToScreenCoord(struct EventItem const& position) {
     // need to -1 in width and height for 0th offset
     float xPos = (screenWidth - 1) * (position.x + worldWidth / 2) / worldWidth;
     float yPos = (screenHeight - 1) * (position.y + worldHeight / 2) / worldHeight;
@@ -299,8 +324,8 @@ static void initProgram() {
     currentFrame = 0;
     currentSteppedFrame = 0;
 
-    curPosition = { 0.0f, 0.0f };
-    rawPosition = { 0.0f, 0.0f };
+    clock_gettime(CLOCK_MONOTONIC, &curTime);
+    clock_gettime(CLOCK_MONOTONIC, &startTime);
 
     rng.seed(std::random_device()());
 
@@ -328,12 +353,6 @@ static bool initOpenGL() {
     // setup face culling
     glEnable(GL_CULL_FACE);
     checkGLError("glEnable");
-
-    // opengl init buffers and bind data
-    // format of vertex attribute (POS_ATTRIB)
-    // @TODO figure out why there is an error here
-    glVertexAttribFormat(POS_ATTRIB, 3, GL_FLOAT, GL_FALSE, 0);
-    checkGLError("glVertexAttribFormat");
 
     // generate buffers
     glGenBuffers(1, &rectangleBuffer);
@@ -364,15 +383,21 @@ static bool initOpenGL() {
     return true;
 }
 
+// TODO decouple this from OPENGL renderer (so it doenst call shit)
 static bool initOpenGLObjects() {
     circle = Circle();
     originPoint = Object();
     auto childObj = std::make_unique<Object>();
-    touchPointer = Object();
+
+    for (auto& item : pointerList) {
+        delete item;
+        item = new Object();
+        gameObjects.emplace(item);
+        LOGI("%p", item);
+    }
 
     // add to list of game objects
     gameObjects.emplace(&originPoint);
-    gameObjects.emplace(&touchPointer);
     gameObjects.emplace(childObj.get());
 
     // modify objects
@@ -435,25 +460,48 @@ static void stepGame() {
         circlePosition = glm::vec3(x, y, 0);
     }
 
-    // update the position of touchPointer
-    touchPointer.translation = glm::vec3(curPosition.x, curPosition.y, 0.0f);
+    // disable non updated pointers
+    for (auto const& item : pointerList) {
+        if (item == nullptr) {
+            continue;
+        }
+        item->isActive = false;
+    }
+
+    // update the position of pointers
+    for (int i = 0; i < curPositionList.size(); ++i) {
+        if (pointerList[i] == nullptr) {
+            continue;
+        }
+        pointerList[i]->translation = glm::vec3(curPositionList[i].x, curPositionList[i].y, 0.0f);
+        pointerList[i]->Update();
+        pointerList[i]->isActive = true;
+    }
 
     // update the rotation of the cool object
     originPoint.rotation = glm::rotate(originPoint.rotation, glm::radians(1.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     originPoint.rotation = glm::normalize(originPoint.rotation);
 
-    touchPointer.Update();
     originPoint.Update();
 
     std::set<Object*> collidedObjects;
     std::set<Object*> nonCollidedObjects;
 
     // check collision
-    for (auto& it : gameObjects) {
+    for (auto const& it : gameObjects) {
+        // skip for inactive objects
+        if (!it->isActive) {
+            continue;
+        }
         // find a list of objects which have collided
-        for (auto& other : gameObjects) {
+        for (auto const& other : gameObjects) {
             // skip if me == other
             if (it == other) {
+                continue;
+            }
+
+            // skip for inactive objects
+            if (!other->isActive) {
                 continue;
             }
 
@@ -466,12 +514,12 @@ static void stepGame() {
     }
 
     // set collided objects to a yellow color
-    for (auto& it : collidedObjects) {
+    for (auto const& it : collidedObjects) {
         it->color = glm::vec4(1.0f, 1.0f, 0.0f, 1.0f);
     }
 
     std::set_difference(gameObjects.begin(), gameObjects.end(), collidedObjects.begin(), collidedObjects.end(), std::inserter(nonCollidedObjects, nonCollidedObjects.end()));
-    for (auto& it : nonCollidedObjects) {
+    for (auto const& it : nonCollidedObjects) {
         it->color = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f);
     }
 }
@@ -480,6 +528,7 @@ static void updateTime() {
     // update previous time to current time
     struct timespec res;
     clock_gettime(CLOCK_MONOTONIC, &res);
+    clock_gettime(CLOCK_MONOTONIC, &curTime);
 
     // store current time
     prevTimeUPS = res;
@@ -555,11 +604,16 @@ static void resumeGameEngine() {
     prevTimeUPS.tv_nsec = res.tv_nsec - timeDiff.tv_nsec;
 }
 
-static void storeEvent(struct EventItem event) {
+static void storeEvent(std::vector<struct EventItem> const& event) {
     // convert android xy coords to world coords
-    struct EventItem convertedEvent = convertScreenCoordToWorldCoord(event);
-    inputBuffer.push(convertedEvent);
+    std::vector<struct EventItem> convertedList;
+    for (auto& item : event) {
+        struct EventItem convertedEvent = convertScreenCoordToWorldCoord(item);
+        convertedList.emplace_back(convertedEvent);
+    }
+
     rawInputBuffer.push(event);
+    inputBuffer.push(convertedList);
 }
 
 static void processInput() {
@@ -567,7 +621,7 @@ static void processInput() {
         return;
     }
 
-    struct EventItem s = inputBuffer.front();
+    std::vector<struct EventItem> s = inputBuffer.front();
     inputBuffer.pop();
 
     // ignore input if paused
@@ -575,8 +629,7 @@ static void processInput() {
         return;
     }
 
-    curPosition.x = s.x;
-    curPosition.y = s.y;
+    curPositionList = s;
 }
 
 static void processRawInput() {
@@ -584,7 +637,7 @@ static void processRawInput() {
         return;
     }
 
-    struct EventItem s = rawInputBuffer.front();
+    std::vector<struct EventItem> s = rawInputBuffer.front();
     rawInputBuffer.pop();
 
     // ignore input if paused
@@ -592,8 +645,7 @@ static void processRawInput() {
         return;
     }
 
-    rawPosition.x = s.x;
-    rawPosition.y = s.y;
+    rawPositionList = s;
 }
 
 static void renderFrame() {
@@ -664,12 +716,46 @@ static void drawTouchDot() {
     modelMat = glm::mat4(1.0f);
     mat = orthoMat * modelMat;
 
-    // draw objects with a scene graph (origin point at 10.0f on y axis)
-    touchPointer.Draw(mat, mvpMatrixLoc, colorVecLoc);
-    touchPointer.DrawAABB(mat, mvpMatrixLoc, colorVecLoc);
+    // draw all gameobjects
+    for (auto const& it : gameObjects) {
+        // skip for non root objects
+        if (it->parent != nullptr) {
+            continue;
+        }
 
-    originPoint.Draw(mat, mvpMatrixLoc, colorVecLoc);
-    originPoint.DrawAABB(mat, mvpMatrixLoc, colorVecLoc);
+        // skip for inactive objects
+        if (!it->isActive) {
+            continue;
+        }
+
+        // draw
+        it->Draw(mat, mvpMatrixLoc, colorVecLoc);
+    }
+
+    // draw aabb
+    for (auto const& it : gameObjects) {
+        // skip for non root objects
+        if (it->parent != nullptr) {
+            continue;
+        }
+
+        // skip for inactive objects
+        if (!it->isActive) {
+            continue;
+        }
+
+        // draw AABB
+        it->DrawAABB(mat, mvpMatrixLoc, colorVecLoc);
+    }
+
+//    // draw objects with a scene graph (origin point at 10.0f on y axis)
+//    originPoint.Draw(mat, mvpMatrixLoc, colorVecLoc);
+//    originPoint.DrawAABB(mat, mvpMatrixLoc, colorVecLoc);
+//
+//    for (int i = 0; i < curPositionList.size(); ++i) {
+//        pointerList[i]->Draw(mat, mvpMatrixLoc, colorVecLoc);
+//        pointerList[i]->DrawAABB(mat, mvpMatrixLoc, colorVecLoc);
+//    }
 
     glBindVertexArray(0);
 }
@@ -818,6 +904,7 @@ JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_obtainFPS(J
     jfieldID param3Field = env->GetFieldID(clazz, "true_ups", "F");
     jfieldID param4Field = env->GetFieldID(clazz, "frame", "J");
     jfieldID param5Field = env->GetFieldID(clazz, "stepped_frame", "J");
+    jfieldID param6Field = env->GetFieldID(clazz, "cur_time", "J");
 
     // Set fields for object
     env->SetFloatField(obj, param1Field, fps);
@@ -825,53 +912,97 @@ JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_obtainFPS(J
     env->SetFloatField(obj, param3Field, true_ups);
     env->SetLongField(obj, param4Field, currentFrame);
     env->SetLongField(obj, param5Field, currentSteppedFrame);
+    env->SetLongField(obj, param6Field, curTime.tv_sec - startTime.tv_sec);
 }
 
-JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_obtainPos(JNIEnv *env,
-                                                                               jclass javaThis,
-                                                                               jobject obj) {
+JNIEXPORT jobjectArray JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_obtainPos(JNIEnv *env,
+                                                                               jclass javaThis) {
     LOGV(__FUNCTION__, "obtainFPS");
 
-    jclass clazz = env->GetObjectClass(obj);
+    unsigned long positionListSize = curPositionList.size();
 
-    // Get Field references
-    jfieldID param1Field = env->GetFieldID(clazz, "x", "F");
-    jfieldID param2Field = env->GetFieldID(clazz, "y", "F");
-    jfieldID param3Field = env->GetFieldID(clazz, "normX", "F");
-    jfieldID param4Field = env->GetFieldID(clazz, "normY", "F");
+    jclass clazz = env->FindClass("xyz/velvetmilk/boyboyemulator/BBoyInputEvent");
+    jmethodID constructor = env->GetMethodID(clazz, "<init>", "()V");
+    jobjectArray retArray = env->NewObjectArray(static_cast<jsize>(positionListSize), clazz, nullptr);
 
-    // Set fields for object
-    env->SetFloatField(obj, param1Field, rawPosition.x);
-    env->SetFloatField(obj, param2Field, rawPosition.y);
+    for (int i = 0; i < positionListSize; ++i) {
+        jobject newObj = env->NewObject(clazz, constructor);
+
+        // Get Field references
+        jfieldID param1Field = env->GetFieldID(clazz, "x", "F");
+        jfieldID param2Field = env->GetFieldID(clazz, "y", "F");
+        jfieldID param3Field = env->GetFieldID(clazz, "normX", "F");
+        jfieldID param4Field = env->GetFieldID(clazz, "normY", "F");
+
+        // Set fields for object
+        env->SetFloatField(newObj, param1Field, rawPositionList[i].x);
+        env->SetFloatField(newObj, param2Field, rawPositionList[i].y);
+
 //    struct EventItem converted = convertWorldCoordToScreenCoord(curPosition);
 //    env->SetFloatField(obj, param1Field, converted.x);
 //    env->SetFloatField(obj, param2Field, converted.y);
 
-    // convert to normalised position
-    env->SetFloatField(obj, param3Field, curPosition.x);
-    env->SetFloatField(obj, param4Field, curPosition.y);
+        env->SetFloatField(newObj, param3Field, curPositionList[i].x);
+        env->SetFloatField(newObj, param4Field, curPositionList[i].y);
+
+        env->SetObjectArrayElement(retArray, i, newObj);
+    }
+
+    return retArray;
+}
+
+JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_obtainPosInplace(JNIEnv *env,
+                                                                                       jclass javaThis,
+                                                                                       jobjectArray objArray) {
+    LOGV(__FUNCTION__, "obtainFPSInplace");
+
+    unsigned long positionListSize = curPositionList.size();
+
+    jclass clazz = env->FindClass("xyz/velvetmilk/boyboyemulator/BBoyInputEvent");
+
+    for (int i = 0; i < positionListSize; ++i) {
+
+        // Get Field references
+        jfieldID param1Field = env->GetFieldID(clazz, "x", "F");
+        jfieldID param2Field = env->GetFieldID(clazz, "y", "F");
+        jfieldID param3Field = env->GetFieldID(clazz, "normX", "F");
+        jfieldID param4Field = env->GetFieldID(clazz, "normY", "F");
+
+        // load memory already provided
+        jobject curElement = env->GetObjectArrayElement(objArray, i);
+        env->SetFloatField(curElement, param1Field, rawPositionList[i].x);
+        env->SetFloatField(curElement, param2Field, rawPositionList[i].y);
+        env->SetFloatField(curElement, param3Field, curPositionList[i].x);
+        env->SetFloatField(curElement, param4Field, curPositionList[i].y);
+        env->SetObjectArrayElement(objArray, i, curElement);
+    }
 }
 
 JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_sendEvent(JNIEnv *env,
                                                                                jclass javaThis,
-                                                                               jobject obj) {
+                                                                               jobjectArray objArray) {
     LOGV(__FUNCTION__, "sendEvent");
 
-    jclass clazz = env->GetObjectClass(obj);
+    std::vector<struct EventItem> eventList;
 
-    // Get Field references
-    jfieldID param1Field = env->GetFieldID(clazz, "x", "F");
-    jfieldID param2Field = env->GetFieldID(clazz, "y", "F");
+    jsize length = env->GetArrayLength(objArray);
+    for (int i = 0; i < length; ++i) {
+        jobject obj = env->GetObjectArrayElement(objArray, i);
+        jclass clazz = env->GetObjectClass(obj);
 
-    // Set fields for object
-    jfloat x = env->GetFloatField(obj, param1Field);
-    jfloat y = env->GetFloatField(obj, param2Field);
+        // Get Field references
+        jfieldID param1Field = env->GetFieldID(clazz, "x", "F");
+        jfieldID param2Field = env->GetFieldID(clazz, "y", "F");
 
-    // convert jobject to struct EventItem
-    struct EventItem item = {x, y};
+        // Set fields for object
+        jfloat x = env->GetFloatField(obj, param1Field);
+        jfloat y = env->GetFloatField(obj, param2Field);
 
+        // convert jobject to struct EventItem
+        eventList.emplace_back(x, y);
+    }
     // object class is a MotionEvent
     // store event into input buffer
-    storeEvent(item);
+    storeEvent(eventList);
 }
 }

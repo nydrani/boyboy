@@ -34,11 +34,15 @@
 #define M_PI_FLOAT 3.14159265358979323846f
 #define WORLD_SIZE 100
 
+#define MAX_POINTER_SIZE 10
+
 #define POS_ATTRIB 0
 
 #define DOT_RADIUS 1.0f
 
 struct EventItem {
+    EventItem() {}
+    EventItem(float x, float y) : x(x), y(y) {}
     float x;
     float y;
 };
@@ -46,8 +50,10 @@ struct EventItem {
 bool checkGLError(const char *funcName);
 void printGLErrors();
 void printGLString(const char *name, GLenum s);
-struct EventItem convertScreenCoordToWorldCoord(struct EventItem &position);
-struct EventItem convertWorldCoordToScreenCoord(struct EventItem &position);
+struct EventItem convertScreenCoordToWorldCoord(struct EventItem const& position);
+struct EventItem convertWorldCoordToScreenCoord(struct EventItem const& position);
+void convertScreenCoordToWorldCoord(struct EventItem& position);
+void convertWorldCoordToScreenCoord(struct EventItem& position);
 GLuint createShader(GLenum shaderType, const char *src);
 GLuint createProgram(const char *vtxSrc, const char *fragSrc);
 
@@ -65,8 +71,9 @@ extern "C" {
     JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_pauseEngine(JNIEnv *, jclass);
     JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_shutdown(JNIEnv *, jclass);
     JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_obtainFPS(JNIEnv *, jclass, jobject);
-    JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_obtainPos(JNIEnv *, jclass, jobject);
-    JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_sendEvent(JNIEnv *, jclass, jobject);
+    JNIEXPORT jobjectArray JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_obtainPos(JNIEnv *, jclass);
+    JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_obtainPosInplace(JNIEnv *, jclass, jobjectArray);
+    JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_sendEvent(JNIEnv *, jclass, jobjectArray);
 }
 
 #endif

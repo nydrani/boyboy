@@ -26,12 +26,13 @@ class MainActivity : Activity() {
     private lateinit var trueupsView: TextView
     private lateinit var curFrameView: TextView
     private lateinit var curSteppedFrameView: TextView
+    private lateinit var curTimeView: TextView
     private lateinit var posView: TextView
     private lateinit var normPosView: TextView
 
 
     private val fpsInfo: BBoyFPS = BBoyFPS()
-    private val posInfo: BBoyInputEvent = BBoyInputEvent()
+    private val posInfo: MutableList<BBoyInputEvent> = mutableListOf()
 
     private val handler = Handler(Looper.getMainLooper()) {
         when (it.what) {
@@ -62,6 +63,7 @@ class MainActivity : Activity() {
         trueupsView = true_ups_text
         curFrameView = cur_frame_text
         curSteppedFrameView = cur_stepped_frame_text
+        curTimeView = cur_time_text
         posView = pos_text
         normPosView = norm_pos_text
 
@@ -164,10 +166,25 @@ class MainActivity : Activity() {
         trueupsView.text = "TRUE_UPS: " + fpsInfo.true_ups.toString()
         curFrameView.text = "Frame #: " + fpsInfo.frame.toString()
         curSteppedFrameView.text = "Stepped Frame #: " + fpsInfo.stepped_frame.toString()
+        curTimeView.text = "Time: " + fpsInfo.cur_time.toString()
     }
 
-    private fun updatePosText(posInfo: BBoyInputEvent) {
-        posView.text = "x: " + posInfo.x.toString() + " | y: " + posInfo.y.toString()
-        normPosView.text = "norm x: " + posInfo.normX.toString() + " | norm y: " + posInfo.normY.toString()
+    private fun updatePosText(posInfo: List<BBoyInputEvent>) {
+        if (posInfo.isEmpty()) {
+            return
+        }
+
+        val stringBuilder = StringBuilder()
+        val normStringBuilder = StringBuilder()
+        for ((index, event) in posInfo.withIndex()) {
+            stringBuilder.appendln(index.toString() + " | x: " + event.x.toString() + " | y: " + event.y.toString())
+            normStringBuilder.appendln(index.toString() + " | norm x: " + event.normX.toString() + " | norm y: " + event.normY.toString())
+        }
+
+        stringBuilder.deleteCharAt(stringBuilder.length-1)
+        normStringBuilder.deleteCharAt(normStringBuilder.length-1)
+
+        posView.text = stringBuilder.toString()
+        normPosView.text = normStringBuilder.toString()
     }
 }
