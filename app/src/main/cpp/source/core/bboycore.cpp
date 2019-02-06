@@ -189,12 +189,14 @@ static int yeeNum;
 static float bgColor;
 
 static struct timespec prevTimeUPS;
+static struct timespec prevTimeSPS;
 static struct timespec prevTimeFPS;
 static struct timespec timeDiff;
 static bool paused;
 static bool enginePaused;
 static float colorUpdate;
 
+static float sps;
 static float fps;
 static float ups;
 static float true_ups;
@@ -284,15 +286,15 @@ struct EventItem convertWorldCoordToScreenCoord(struct EventItem const& position
     return { xPos, -yPos };
 }
 
-static float getElapsedTime(struct timespec &prevTime, struct timespec &curTime) {
+static float getElapsedTime(struct timespec const& prevTime, struct timespec const& curTime) {
     // calculate elapsed time between prev and cur
     __kernel_long_t elapsedSec = curTime.tv_sec - prevTime.tv_sec;
     long elapsedNSec = curTime.tv_nsec - prevTime.tv_nsec;
 
     // subtraction carry
-    if (prevTime.tv_nsec  > curTime.tv_nsec) {
-        elapsedSec--;
-        elapsedNSec = curTime.tv_nsec - prevTime.tv_nsec + BILLION;
+    if (prevTime.tv_nsec > curTime.tv_nsec) {
+        --elapsedSec;
+        elapsedNSec += BILLION;
     }
 
     // convert to float
@@ -308,12 +310,17 @@ static void initProgram() {
     yeeNum = 0;
     bgColor = 0.0f;
 
-    struct timespec res;
-    clock_gettime(CLOCK_MONOTONIC, &res);
-    prevTimeFPS = res;
-    prevTimeUPS = res;
+//    struct timespec res;
+//    clock_gettime(CLOCK_MONOTONIC, &res);
+//    prevTimeFPS = res;
+//    prevTimeUPS = res;
+//    prevTimeSPS = res;
+//    curTime = res;
+//    startTime = res;
 
     colorUpdate = 0.02f;
+
+    sps = 0.0f;
     fps = 0.0f;
     ups = 0.0f;
     true_ups = 0.0f;
@@ -393,7 +400,6 @@ static bool initOpenGLObjects() {
         delete item;
         item = new Object();
         gameObjects.emplace(item);
-        LOGI("%p", item);
     }
 
     // add to list of game objects
@@ -528,9 +534,9 @@ static void updateTime() {
     // update previous time to current time
     struct timespec res;
     clock_gettime(CLOCK_MONOTONIC, &res);
-    clock_gettime(CLOCK_MONOTONIC, &curTime);
 
     // store current time
+    curTime = res;
     prevTimeUPS = res;
 }
 
@@ -541,27 +547,44 @@ static void updateGame() {
     float elapsed = getElapsedTime(prevTimeUPS, res);
     lag += elapsed;
 
-    // num updates per second
-    int updateCounter = 0;
+    // update time before stepping game
+    curTime = res;
+    prevTimeUPS = res;
+
+    // num steps per update call
+    int stepCounter = 0;
 
     // update in steps
-    while (lag >= MS_PER_UPDATE && updateCounter < MAX_FRAME_SKIP) {
+    while (lag >= MS_PER_UPDATE && stepCounter < MAX_FRAME_SKIP) {
         if (!paused) {
             stepGame();
         }
         lag -= MS_PER_UPDATE;
 
         currentFrame++;
-        updateCounter++;
+        stepCounter++;
+
+//        // update steps per second counter
+//        float elapsedSPS = getElapsedTime(prevTimeSPS, res);
+//        if (elapsedSPS != 0.0f) {
+//            sps = MOVING_AVERAGE_ALPHA * sps + (1.0f - MOVING_AVERAGE_ALPHA) / elapsedSPS;
+//        }
+//        prevTimeSPS = res;
     }
 
     if (!paused) {
         interpolation = lag / MS_PER_UPDATE;
     }
 
-    if (updateCounter > 0) {
-        ups = MOVING_AVERAGE_ALPHA * ups + (1.0f - MOVING_AVERAGE_ALPHA) * updateCounter / elapsed;
-        true_ups = MOVING_AVERAGE_ALPHA * true_ups + (1.0f - MOVING_AVERAGE_ALPHA) / elapsed;
+    // update debug counters
+    true_ups = MOVING_AVERAGE_ALPHA * true_ups + (1.0f - MOVING_AVERAGE_ALPHA) / elapsed;
+
+    if (stepCounter > 0) {
+        ups = MOVING_AVERAGE_ALPHA * ups + (1.0f - MOVING_AVERAGE_ALPHA) * stepCounter / elapsed;
+
+        float elapsedSPS = getElapsedTime(prevTimeSPS, res);
+        sps = MOVING_AVERAGE_ALPHA * sps + (1.0f - MOVING_AVERAGE_ALPHA) * stepCounter / elapsedSPS;
+        prevTimeSPS = res;
     }
 }
 
@@ -761,6 +784,16 @@ static void drawTouchDot() {
 }
 
 static void runGameLoop() {
+    // setup time based variables
+    struct timespec res;
+    clock_gettime(CLOCK_MONOTONIC, &res);
+    prevTimeFPS = res;
+    prevTimeUPS = res;
+    prevTimeSPS = res;
+    curTime = res;
+    startTime = res;
+
+
     while (running) {
         if (!openGLReady) {
             continue;
@@ -776,7 +809,7 @@ static void runGameLoop() {
         updateGame();
 
         // rendering is externally called
-        updateTime();
+//        updateTime();
 
         // print any errors which may have occurred
         printGLErrors();
@@ -905,6 +938,7 @@ JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_obtainFPS(J
     jfieldID param4Field = env->GetFieldID(clazz, "frame", "J");
     jfieldID param5Field = env->GetFieldID(clazz, "stepped_frame", "J");
     jfieldID param6Field = env->GetFieldID(clazz, "cur_time", "J");
+    jfieldID param7Field = env->GetFieldID(clazz, "sps", "F");
 
     // Set fields for object
     env->SetFloatField(obj, param1Field, fps);
@@ -913,6 +947,7 @@ JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_obtainFPS(J
     env->SetLongField(obj, param4Field, currentFrame);
     env->SetLongField(obj, param5Field, currentSteppedFrame);
     env->SetLongField(obj, param6Field, curTime.tv_sec - startTime.tv_sec);
+    env->SetFloatField(obj, param7Field, sps);
 }
 
 JNIEXPORT jobjectArray JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_obtainPos(JNIEnv *env,

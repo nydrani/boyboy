@@ -22,6 +22,7 @@ class MainActivity : Activity() {
 
     private lateinit var openGLDebugView: TextView
     private lateinit var fpsView: TextView
+    private lateinit var spsView: TextView
     private lateinit var upsView: TextView
     private lateinit var trueupsView: TextView
     private lateinit var curFrameView: TextView
@@ -59,6 +60,7 @@ class MainActivity : Activity() {
         surfaceView = surface_view
         openGLDebugView = opengl_version_text
         fpsView = fps_text
+        spsView = sps_text
         upsView = ups_text
         trueupsView = true_ups_text
         curFrameView = cur_frame_text
@@ -162,6 +164,7 @@ class MainActivity : Activity() {
 
     private fun updateFPSText(fpsInfo: BBoyFPS) {
         fpsView.text = "FPS: " + fpsInfo.fps.toString()
+        spsView.text = "SPS: " + fpsInfo.sps.toString()
         upsView.text = "UPS: " + fpsInfo.ups.toString()
         trueupsView.text = "TRUE_UPS: " + fpsInfo.true_ups.toString()
         curFrameView.text = "Frame #: " + fpsInfo.frame.toString()
