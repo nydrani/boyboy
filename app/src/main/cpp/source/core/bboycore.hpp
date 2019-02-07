@@ -1,5 +1,5 @@
 #ifndef BBOYCORE_H
-#define BBOYCORE_H 1
+#define BBOYCORE_H
 
 #include <jni.h>
 #include <string>
@@ -8,7 +8,7 @@
 #include <GLES3/gl32.h>
 #include <GLES3/gl3ext.h>
 
-#define  LOG_TAG    "libbboycore"
+#define LOG_TAG "libbboycore"
 
 #define DEBUG true
 #if DEBUG
@@ -25,7 +25,7 @@
 #define  LOGA(...)  __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 
 
-#define TIME_STEP 60
+#define TIME_STEP 120
 #define MS_PER_UPDATE (1.0f / TIME_STEP)
 #define MAX_FRAME_SKIP 10
 #define MOVING_AVERAGE_ALPHA 0.9f
@@ -59,7 +59,6 @@ GLuint createProgram(const char *vtxSrc, const char *fragSrc);
 
 
 extern "C" {
-    JNIEXPORT jint JNI_OnLoad(JavaVM *, void *);
     JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_init(JNIEnv *, jclass);
     JNIEXPORT jboolean JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_initOpenGL(JNIEnv *, jclass);
     JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_setup(JNIEnv *, jclass, jint, jint);

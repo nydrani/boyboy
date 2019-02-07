@@ -209,8 +209,6 @@ static int screenHeight;
 static float worldWidth;
 static float worldHeight;
 
-static float dotRotation;
-
 // NOTE: Probably remove current position list off to be NOT lingering
 static std::vector<struct EventItem> curPositionList;
 static std::vector<struct EventItem> rawPositionList;
@@ -326,7 +324,6 @@ static void initProgram() {
     true_ups = 0.0f;
     lag = 0.0f;
     interpolation = 0.0f;
-    dotRotation = 0.0f;
 
     currentFrame = 0;
     currentSteppedFrame = 0;
@@ -438,25 +435,22 @@ static void stepGame() {
     currentSteppedFrame++;
 
     yeeNum++;
-    yeeNum %= 60;
+    yeeNum %= TIME_STEP;
 
     // increase vs decrease color
     bgColor += colorUpdate;
 
     // toggle color
     if (bgColor > 1.0f) {
-        colorUpdate = -0.02f;
+        colorUpdate = -1.0f * MS_PER_UPDATE / 2;
     }
 
     if (bgColor < 0.0f) {
-        colorUpdate = +0.02f;
+        colorUpdate = +1.0f * MS_PER_UPDATE / 2;
     }
 
-    // increase dot rotation
-    dotRotation += 1.0f;
-    if (dotRotation >= 360.0f) {
-        dotRotation = 0.0f;
-    }
+    // clamp bgcolor to [0, 1]
+    bgColor = glm::clamp(bgColor, 0.0f, 1.0f);
 
     // update circle position
     if (yeeNum == 0) {
@@ -834,10 +828,16 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
 
     JNIEnv *env;
     if (vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6) != JNI_OK) {
-        return -1;
+        return JNI_ERR;
     }
 
     return JNI_VERSION_1_6;
+}
+
+JNIEXPORT void JNI_OnUnload(JavaVM *vm, void *reserved) {
+    LOGV(__FUNCTION__, "onUnload");
+
+    // do nothing lol
 }
 
 JNIEXPORT void JNICALL Java_xyz_velvetmilk_boyboyemulator_BBoyJNILib_init(JNIEnv *env,
