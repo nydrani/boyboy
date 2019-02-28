@@ -12,17 +12,17 @@
 
 #define DEBUG true
 #if DEBUG
-    #define  LOGI(...)  __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
-    #define  LOGE(...)  __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
-    #define  LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
-    #define  LOGV(...)  __android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, __VA_ARGS__)
+    #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+    #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+    #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
+    #define LOGV(...) __android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, __VA_ARGS__)
 #else
-    #define  LOGI(...)
-    #define  LOGE(...)
-    #define  LOGD(...)
-    #define  LOGV(...)
+    #define LOGI(...)
+    #define LOGE(...)
+    #define LOGD(...)
+    #define LOGV(...)
 #endif
-#define  LOGA(...)  __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGA(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 
 
 #define TIME_STEP 120
@@ -41,7 +41,7 @@
 #define DOT_RADIUS 1.0f
 
 struct EventItem {
-    EventItem() {}
+    EventItem() = default;
     EventItem(float x, float y) : x(x), y(y) {}
     float x;
     float y;

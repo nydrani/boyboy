@@ -32,6 +32,9 @@ Object::Object(glm::vec3 translation, glm::quat rotation, glm::vec3 scale)
     bBoxIndices.emplace_back(6);
     bBoxIndices.emplace_back(7);
 
+    // set velocity to 0;
+    velocity = glm::vec3(0.0f, 0.0f, 0.0f);
+
     // set color to black
     color = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
 
@@ -96,6 +99,9 @@ glm::mat4 Object::TRS(glm::mat4 curWorldModel) const {
 }
 
 void Object::Update() {
+    // update translation from velocity
+    this->translation += this->velocity;
+
     // update aabb vertices
     updateAABBVertices();
 

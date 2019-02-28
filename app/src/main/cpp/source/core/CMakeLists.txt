@@ -1,4 +1,4 @@
-add_library(bboycore SHARED bboycore.cpp)
+add_library(bboycore SHARED bboycore.cpp bboycore.hpp)
 
 target_link_libraries(bboycore
         bboytools

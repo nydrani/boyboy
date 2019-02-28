@@ -1,3 +1,5 @@
+#define GLM_ENABLE_EXPERIMENTAL
+
 #include <string>
 #include <thread>
 #include <queue>
@@ -15,6 +17,7 @@
 #include <glm/ext.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/string_cast.hpp>
 #include <set>
 #include <sstream>
 
@@ -222,7 +225,8 @@ static std::thread gameLoop;
 static bool running;
 static bool openGLReady;
 
-static std::set<Object*> gameObjects;
+static std::set<Object*> allGameObjects;
+static std::set<Object*> rootGameObjects;
 
 static struct timespec startTime;
 static struct timespec curTime;
@@ -230,8 +234,6 @@ static struct timespec curTime;
 static uint64_t currentFrame;
 static uint64_t currentSteppedFrame;
 
-static GLuint rectangleBuffer;
-static GLuint rectangleVAO;
 static GLint mvpMatrixLoc;
 static GLint colorVecLoc;
 
@@ -240,7 +242,10 @@ static std::mt19937 rng;
 static Circle circle;
 static Object originPoint;
 static Object* pointerList[MAX_POINTER_SIZE];
-static glm::vec3 circlePosition;
+
+static Object puckObject;
+static Object player1Object;
+static Object player2Object;
 // =========================
 
 // normalization formula : x between [a, b]
@@ -358,20 +363,6 @@ static bool initOpenGL() {
     glEnable(GL_CULL_FACE);
     checkGLError("glEnable");
 
-    // generate buffers
-    glGenBuffers(1, &rectangleBuffer);
-    glGenVertexArrays(1, &rectangleVAO);
-
-    // bind rectangle
-    glBindVertexArray(rectangleVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, rectangleBuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(*boxVertices.begin()) * boxVertices.size(), boxVertices.begin(), GL_STATIC_DRAW);
-    glVertexAttribPointer(POS_ATTRIB, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(POS_ATTRIB);
-
-    glBindVertexArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-
     // setup program (shaders)
     glUseProgram(program);
     checkGLError("glUseProgram");
@@ -396,12 +387,27 @@ static bool initOpenGLObjects() {
     for (auto& item : pointerList) {
         delete item;
         item = new Object();
-        gameObjects.emplace(item);
+        allGameObjects.emplace(item);
+        rootGameObjects.emplace(item);
     }
 
+    // create puck and two handles
+    puckObject = Object();
+    puckObject.velocity = glm::vec3(0.05f, 0.05f, 0.0f);
+    player1Object = Object();
+    player2Object = Object();
+
     // add to list of game objects
-    gameObjects.emplace(&originPoint);
-    gameObjects.emplace(childObj.get());
+    allGameObjects.emplace(&puckObject);
+    allGameObjects.emplace(&player1Object);
+    allGameObjects.emplace(&player2Object);
+    allGameObjects.emplace(&originPoint);
+    allGameObjects.emplace(childObj.get());
+
+    rootGameObjects.emplace(&puckObject);
+    rootGameObjects.emplace(&player1Object);
+    rootGameObjects.emplace(&player2Object);
+    rootGameObjects.emplace(&originPoint);
 
     // modify objects
     originPoint.translation = glm::vec3(0, 10, 0);
@@ -452,13 +458,12 @@ static void stepGame() {
     // clamp bgcolor to [0, 1]
     bgColor = glm::clamp(bgColor, 0.0f, 1.0f);
 
-    // update circle position
-    if (yeeNum == 0) {
-        std::uniform_real_distribution<float> rngPos(-20, 20);
-        float x = rngPos(rng);
-        float y = rngPos(rng);
-        circlePosition = glm::vec3(x, y, 0);
-    }
+    // update random position between [-20, 20]
+//    if (yeeNum == 0) {
+//        std::uniform_real_distribution<float> rngPos(-20, 20);
+//        float x = rngPos(rng);
+//        float y = rngPos(rng);
+//    }
 
     // disable non updated pointers
     for (auto const& item : pointerList) {
@@ -474,7 +479,6 @@ static void stepGame() {
             continue;
         }
         pointerList[i]->translation = glm::vec3(curPositionList[i].x, curPositionList[i].y, 0.0f);
-        pointerList[i]->Update();
         pointerList[i]->isActive = true;
     }
 
@@ -482,19 +486,38 @@ static void stepGame() {
     originPoint.rotation = glm::rotate(originPoint.rotation, glm::radians(1.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     originPoint.rotation = glm::normalize(originPoint.rotation);
 
-    originPoint.Update();
+    // update TRS of puck and players
+    player1Object.translation = glm::vec3(0.0f, -20.0f, 0.0f);
+    player2Object.translation = glm::vec3(0.0f, 20.0f, 0.0f);
 
     std::set<Object*> collidedObjects;
     std::set<Object*> nonCollidedObjects;
 
+    // update objects
+    for (auto const& it : rootGameObjects) {
+        it->Update();
+    }
+
+    // custom code for puck updating
+    if (puckObject.translation.x < -worldWidth / 2 || puckObject.translation.x > worldWidth / 2) {
+        puckObject.velocity.x = -puckObject.velocity.x;
+    }
+
+    if (puckObject.translation.y < -worldHeight/ 2 || puckObject.translation.y > worldHeight / 2) {
+        std::uniform_real_distribution<float> rngVel(-0.05f, 0.05f);
+        float v = rngVel(rng);
+        puckObject.velocity = glm::vec3(v, v, 0.0f);
+        puckObject.translation = glm::vec3(5.0f, 0.0f, 0.0f);
+    }
+
     // check collision
-    for (auto const& it : gameObjects) {
+    for (auto const& it : allGameObjects) {
         // skip for inactive objects
         if (!it->isActive) {
             continue;
         }
         // find a list of objects which have collided
-        for (auto const& other : gameObjects) {
+        for (auto const& other : allGameObjects) {
             // skip if me == other
             if (it == other) {
                 continue;
@@ -515,10 +538,14 @@ static void stepGame() {
 
     // set collided objects to a yellow color
     for (auto const& it : collidedObjects) {
+        if (it == &puckObject) {
+            it->velocity.y = -(it->velocity.y * 1.1f);
+            it->velocity.x = -(it->velocity.x * 1.1f);
+        }
         it->color = glm::vec4(1.0f, 1.0f, 0.0f, 1.0f);
     }
 
-    std::set_difference(gameObjects.begin(), gameObjects.end(), collidedObjects.begin(), collidedObjects.end(), std::inserter(nonCollidedObjects, nonCollidedObjects.end()));
+    std::set_difference(allGameObjects.begin(), allGameObjects.end(), collidedObjects.begin(), collidedObjects.end(), std::inserter(nonCollidedObjects, nonCollidedObjects.end()));
     for (auto const& it : nonCollidedObjects) {
         it->color = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f);
     }
@@ -711,17 +738,8 @@ static void drawTouchDot() {
     glm::mat4 orthoMat = glm::ortho(-worldWidth/2.0f, worldWidth/2.0f, -worldHeight/2.0f, worldHeight/2.0f);
     glm::mat4 modelMat, mat;
 
+    // draw circle at (0, 0)
     modelMat = glm::mat4(1.0f);
-    mat = orthoMat * modelMat;
-    glUniformMatrix4fv(mvpMatrixLoc, 1, GL_FALSE, glm::value_ptr(mat));
-    glUniform4fv(colorVecLoc, 1, glm::value_ptr(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)));
-
-    // draw rectangle loop at (0, 0)
-    glBindVertexArray(rectangleVAO);
-    glDrawArrays(GL_LINE_LOOP, 0, 4);
-
-    // draw circle at random point between (-50, 50)
-    modelMat = glm::translate(glm::mat4(1.0f), circlePosition);
     mat = orthoMat * modelMat;
     glUniformMatrix4fv(mvpMatrixLoc, 1, GL_FALSE, glm::value_ptr(mat));
     glUniform4fv(colorVecLoc, 1, glm::value_ptr(glm::vec4(0.0f, 0.0f, 1.0f, 1.0f)));
@@ -734,7 +752,7 @@ static void drawTouchDot() {
     mat = orthoMat * modelMat;
 
     // draw all gameobjects
-    for (auto const& it : gameObjects) {
+    for (auto const& it : allGameObjects) {
         // skip for non root objects
         if (it->parent != nullptr) {
             continue;
@@ -750,7 +768,7 @@ static void drawTouchDot() {
     }
 
     // draw aabb
-    for (auto const& it : gameObjects) {
+    for (auto const& it : allGameObjects) {
         // skip for non root objects
         if (it->parent != nullptr) {
             continue;
@@ -818,8 +836,6 @@ static void shutdown() {
 
     // @TODO kill program shaders etc (may not be necessary since OS just cleans this up)
     glDeleteProgram(program);
-    glDeleteBuffers(1, &rectangleBuffer);
-    glDeleteVertexArrays(1, &rectangleVAO);
 }
 
 extern "C" {

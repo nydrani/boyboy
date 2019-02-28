@@ -15,6 +15,7 @@ class MainActivity : Activity() {
         private val TAG = MainActivity::class.java.simpleName
         private const val FPS_UPDATE = 1
         private const val POS_UPDATE = 2
+        private const val DEBUGGING = false
     }
 
     private lateinit var surfaceView: BBoyGLSurfaceView
@@ -58,6 +59,7 @@ class MainActivity : Activity() {
         setContentView(R.layout.activity_main)
 
         surfaceView = surface_view
+
         openGLDebugView = opengl_version_text
         fpsView = fps_text
         spsView = sps_text
@@ -68,6 +70,19 @@ class MainActivity : Activity() {
         curTimeView = cur_time_text
         posView = pos_text
         normPosView = norm_pos_text
+
+        if (!DEBUGGING) {
+            openGLDebugView.visibility = View.GONE
+            fpsView.visibility = View.GONE
+            spsView.visibility = View.GONE
+            upsView.visibility = View.GONE
+            trueupsView.visibility = View.GONE
+            curFrameView.visibility = View.GONE
+            curSteppedFrameView.visibility = View.GONE
+            curTimeView.visibility = View.GONE
+            posView.visibility = View.GONE
+            normPosView.visibility = View.GONE
+        }
 
         surfaceView.addOpenGLReadyListener(object : BBoyGLSurfaceView.OpenGLReadyListener {
             override fun onOpenGLReady() {

@@ -14,12 +14,12 @@
 class Object {
 public:
     Object(glm::vec3, glm::quat, glm::vec3);
-    Object() : Object(glm::vec3(1.0f, 1.0f, 1.0f), glm::identity<glm::quat>(), glm::vec3(1.0f, 1.0f, 1.0f)) {
+    Object() : Object(glm::vec3(0.0f, 0.0f, 0.0f), glm::identity<glm::quat>(), glm::vec3(1.0f, 1.0f, 1.0f)) {
         LOGD("Being default constructed");
     }
 
     // move constructor
-    Object(Object&& other) noexcept : translation(other.translation), rotation(other.rotation), scale(other.scale), color(other.color) {
+    Object(Object&& other) noexcept : translation(other.translation), rotation(other.rotation), scale(other.scale), velocity(other.velocity), color(other.color) {
         LOGD("Being moved constructed");
 
         isActive = other.isActive;
@@ -51,6 +51,7 @@ public:
         translation = other.translation;
         rotation = other.rotation;
         scale = other.scale;
+        velocity = other.velocity;
         color = other.color;
 
         isActive = other.isActive;
@@ -81,12 +82,13 @@ public:
     glm::vec3 translation;
     glm::quat rotation;
     glm::vec3 scale;
+    glm::vec3 velocity;
     glm::vec4 color;
     bool isActive;
     Object* parent = nullptr;
+    std::unique_ptr<Object> child;
 
 private:
-    std::unique_ptr<Object> child;
     std::vector<glm::vec3> vertices;
     std::vector<glm::vec3> bBoxVertices;
     std::vector<glm::uvec3> indices;

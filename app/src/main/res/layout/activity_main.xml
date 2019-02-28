@@ -62,7 +62,7 @@
 
     <TextView
         android:id="@+id/fps_text"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:textColor="@color/colorAccent"
         app:layout_constraintStart_toStartOf="parent"
@@ -71,7 +71,7 @@
 
     <TextView
         android:id="@+id/sps_text"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:textColor="@color/colorAccent"
         app:layout_constraintStart_toStartOf="parent"
@@ -80,7 +80,7 @@
 
     <TextView
         android:id="@+id/ups_text"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:textColor="@color/colorAccent"
         app:layout_constraintStart_toStartOf="parent"
@@ -89,7 +89,7 @@
 
     <TextView
         android:id="@+id/true_ups_text"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:textColor="@color/colorAccent"
         app:layout_constraintStart_toStartOf="parent"
@@ -99,7 +99,7 @@
 
     <TextView
         android:id="@+id/pos_text"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:textColor="@color/colorAccent"
         app:layout_constraintStart_toStartOf="parent"
@@ -108,7 +108,7 @@
 
     <TextView
         android:id="@+id/norm_pos_text"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:textColor="@color/colorAccent"
         app:layout_constraintStart_toStartOf="parent"
