@@ -6,7 +6,6 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.View
-import android.widget.TextView
 import kotlinx.android.synthetic.main.activity_main.*
 
 
@@ -18,20 +17,7 @@ class MainActivity : Activity() {
         private const val DEBUGGING = false
     }
 
-    private lateinit var surfaceView: BBoyGLSurfaceView
     private lateinit var gameEngine: BBoyGameEngineInterface
-
-    private lateinit var openGLDebugView: TextView
-    private lateinit var fpsView: TextView
-    private lateinit var spsView: TextView
-    private lateinit var upsView: TextView
-    private lateinit var trueupsView: TextView
-    private lateinit var curFrameView: TextView
-    private lateinit var curSteppedFrameView: TextView
-    private lateinit var curTimeView: TextView
-    private lateinit var posView: TextView
-    private lateinit var normPosView: TextView
-
 
     private val fpsInfo: BBoyFPS = BBoyFPS()
     private val posInfo: MutableList<BBoyInputEvent> = mutableListOf()
@@ -58,33 +44,24 @@ class MainActivity : Activity() {
         onWindowFocusChanged(true)
         setContentView(R.layout.activity_main)
 
-        surfaceView = surface_view
-
-        openGLDebugView = opengl_version_text
-        fpsView = fps_text
-        spsView = sps_text
-        upsView = ups_text
-        trueupsView = true_ups_text
-        curFrameView = cur_frame_text
-        curSteppedFrameView = cur_stepped_frame_text
-        curTimeView = cur_time_text
-        posView = pos_text
-        normPosView = norm_pos_text
-
         if (!DEBUGGING) {
-            openGLDebugView.visibility = View.GONE
-            fpsView.visibility = View.GONE
-            spsView.visibility = View.GONE
-            upsView.visibility = View.GONE
-            trueupsView.visibility = View.GONE
-            curFrameView.visibility = View.GONE
-            curSteppedFrameView.visibility = View.GONE
-            curTimeView.visibility = View.GONE
-            posView.visibility = View.GONE
-            normPosView.visibility = View.GONE
+            opengl_version_text.visibility = View.GONE
+            fps_text.visibility = View.GONE
+            sps_text.visibility = View.GONE
+            ups_text.visibility = View.GONE
+            true_ups_text.visibility = View.GONE
+            cur_frame_text.visibility = View.GONE
+            cur_stepped_frame_text.visibility = View.GONE
+            cur_time_text.visibility = View.GONE
+            pos_text.visibility = View.GONE
+            norm_pos_text.visibility = View.GONE
+            pause_button.visibility = View.GONE
+            resume_button.visibility = View.GONE
+            resume_engine_button.visibility = View.GONE
+            pause_engine_button.visibility = View.GONE
         }
 
-        surfaceView.addOpenGLReadyListener(object : BBoyGLSurfaceView.OpenGLReadyListener {
+        surface_view.addOpenGLReadyListener(object : BBoyGLSurfaceView.OpenGLReadyListener {
             override fun onOpenGLReady() {
                 runOnUiThread {
                     setOpenGLDebugInfo()
@@ -106,7 +83,7 @@ class MainActivity : Activity() {
         super.onStart()
         Log.d(TAG, "onStart")
 
-        surfaceView.onResume()
+        surface_view.onResume()
         gameEngine.initFPSRunner(fpsInfo, object : BBoyFPSRunner.OnFPSUpdateListener {
             override fun onFPSUpdate() {
                 handler.sendEmptyMessage(FPS_UPDATE)
@@ -125,7 +102,7 @@ class MainActivity : Activity() {
         super.onStop()
         Log.d(TAG, "onStop")
 
-        surfaceView.onPause()
+        surface_view.onPause()
         gameEngine.shutdownFPSRunner()
         gameEngine.shutdownPosRunner()
 
@@ -171,20 +148,20 @@ class MainActivity : Activity() {
     }
 
     private fun setOpenGLDebugInfo() {
-        val version = surfaceView.openGLVersion
-        val renderer = surfaceView.openGLRenderer
+        val version = surface_view.openGLVersion
+        val renderer = surface_view.openGLRenderer
 
-        openGLDebugView.text = version + "\n" + renderer
+        opengl_version_text.text = version + "\n" + renderer
     }
 
     private fun updateFPSText(fpsInfo: BBoyFPS) {
-        fpsView.text = "FPS: " + fpsInfo.fps.toString()
-        spsView.text = "SPS: " + fpsInfo.sps.toString()
-        upsView.text = "UPS: " + fpsInfo.ups.toString()
-        trueupsView.text = "TRUE_UPS: " + fpsInfo.true_ups.toString()
-        curFrameView.text = "Frame #: " + fpsInfo.frame.toString()
-        curSteppedFrameView.text = "Stepped Frame #: " + fpsInfo.stepped_frame.toString()
-        curTimeView.text = "Time: " + fpsInfo.cur_time.toString()
+        fps_text.text = "FPS: " + fpsInfo.fps.toString()
+        sps_text.text = "SPS: " + fpsInfo.sps.toString()
+        ups_text.text = "UPS: " + fpsInfo.ups.toString()
+        true_ups_text.text = "TRUE_UPS: " + fpsInfo.true_ups.toString()
+        cur_frame_text.text = "Frame #: " + fpsInfo.frame.toString()
+        cur_stepped_frame_text.text = "Stepped Frame #: " + fpsInfo.stepped_frame.toString()
+        cur_time_text.text = "Time: " + fpsInfo.cur_time.toString()
     }
 
     private fun updatePosText(posInfo: List<BBoyInputEvent>) {
@@ -202,7 +179,7 @@ class MainActivity : Activity() {
         stringBuilder.deleteCharAt(stringBuilder.length-1)
         normStringBuilder.deleteCharAt(normStringBuilder.length-1)
 
-        posView.text = stringBuilder.toString()
-        normPosView.text = normStringBuilder.toString()
+        pos_text.text = stringBuilder.toString()
+        norm_pos_text.text = normStringBuilder.toString()
     }
 }

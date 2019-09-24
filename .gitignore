@@ -11,3 +11,6 @@ captures
 .idea
 *.iml
 .externalNativeBuild
+
+# NDK
+app/.cxx
